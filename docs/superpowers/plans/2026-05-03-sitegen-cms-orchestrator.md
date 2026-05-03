@@ -447,7 +447,24 @@ grep -qE "output:\s*['\"]server['\"]" astro.config.mjs && { echo "FATAL: astro.c
 
 If any idempotency check fires: print the diagnostic, advise the operator to manually revert the site (`git reset --hard origin/main` after deleting the local clone) AND delete the Payload tenant if one exists, then re-run.
 
-Read `src/content/site.ts` and `src/content/pages/*.md` to derive metadata. Show the operator:
+Parse `src/content/site.ts` into JSON for downstream phases (Phase 4 dispatch, Phase 9 compose snippet). Use `tsx` via `pnpm dlx` so we don't depend on the cloned site already having `tsx` installed:
+
+```bash
+# Still in ./site-<slug>/ from the cd above
+pnpm dlx tsx --eval "
+  import { site } from './src/content/site';
+  process.stdout.write(JSON.stringify(site, null, 2));
+" > /tmp/site.json
+
+# Sanity-check: brand and primaryDomain must be present
+jq -e '.brand and .primaryDomain' /tmp/site.json >/dev/null || { echo "FATAL: parsed site.ts missing required fields"; cat /tmp/site.json; exit 1; }
+```
+
+`/tmp/site.json` is the canonical parsed siteSettings for the rest of the run. Read brand / language / primaryDomain / aliases / NAP presence / socials / nav out of it via `jq` for the operator summary.
+
+Walk `src/content/pages/` to enumerate pages — for each `*.md`, read the frontmatter `title` / `role` / `order` / `slug` (filename without `.md`).
+
+Show the operator:
 
 ```
 Detected site
@@ -470,26 +487,30 @@ Pages (N):
 
 ## Phase 3 — Provision tenant
 
+Build the request body via `jq -n` so brand/domain values containing quotes or shell metacharacters can't break the JSON or get expanded:
+
 ```bash
 cd /home/shimmy/Desktop/env/sitegen-cms-orchestrator
 set -a; source .env; set +a
 
+PAYLOAD=$(jq -n \
+  --arg slug   "<slug>" \
+  --arg name   "<brand from Phase 2>" \
+  --arg domain "<primaryDomain from Phase 2>" \
+  '{slug:$slug, name:$name, primaryDomain:$domain}')
+
 curl -fsS -X POST "${PAYLOAD_API_URL}/api/tenants" \
   -H "Authorization: Bearer ${PAYLOAD_API_TOKEN}" \
   -H "Content-Type: application/json" \
-  -d "$(cat <<EOF
-{
-  "slug": "<slug>",
-  "name": "<brand from Phase 2>",
-  "primaryDomain": "<primaryDomain from Phase 2>"
-}
-EOF
-)" > /tmp/tenant-create.json
+  -d "${PAYLOAD}" > /tmp/tenant-create.json
 
-cat /tmp/tenant-create.json | jq -r '.doc.id // .id'
+TENANT_ID=$(jq -r '.doc.id // .id' /tmp/tenant-create.json)
+echo "Tenant created: ${TENANT_ID}"
 ```
 
-Capture the tenant ID. Echo it to the operator. If the response indicates "tenant already exists" (4xx with that hint), bail per idempotency rules.
+`TENANT_ID` is now the canonical reference for the rest of the run. Substitute it for every `<tenantId>` placeholder in Phases 4, 8, 9 (compose snippet), and 10. The full create response also persists in `/tmp/tenant-create.json` for re-reads.
+
+If the response indicates "tenant already exists" (4xx with that hint), bail per idempotency rules.
 
 If the operator's intake had a `<tenantId>` placeholder in the VPS data path, replace it now and confirm the resolved path back:
 
@@ -504,9 +525,9 @@ Resolved VPS data path: /srv/data/saas/payload-siab/<tenantId>
 Dispatch the `payload-seeder` subagent. The dispatch prompt must include:
 
 - Absolute site repo path: `/home/shimmy/Desktop/env/sitegen-cms-orchestrator/site-<slug>`
-- Tenant ID (from Phase 3)
+- Tenant ID (`${TENANT_ID}` from Phase 3)
 - `PAYLOAD_API_URL` and `PAYLOAD_API_TOKEN` values
-- The parsed `src/content/site.ts` contents as a JSON blob (orchestrator does the TS-to-JSON parse — pass the whole `site` object)
+- The parsed siteSettings JSON — read `/tmp/site.json` produced in Phase 2 and embed it (or paste as a JSON blob in the dispatch prompt)
 - The list of `src/content/pages/*.md` paths
 
 Wait for the subagent's report. Verify in Payload admin (orchestrator prints a clickable link):
@@ -582,27 +603,30 @@ set -a; source .env; set +a
 # Generate a random password (never logged or surfaced)
 PW=$(head -c 24 /dev/urandom | base64 | tr -d '/+=' | head -c 32)
 
-# Create the user (the API field for tenant linkage may vary per parallel workstream's schema;
-# default assumption: a single 'tenant' field with the tenant ID)
+# Build the request body via jq -n so the random password (which may contain
+# shell metacharacters from base64) and the tenant ID flow through safely.
+USER_BODY=$(jq -n \
+  --arg email "admin@optidigi.nl" \
+  --arg pw    "${PW}" \
+  --arg tid   "${TENANT_ID}" \
+  --arg role  "editor" \
+  '{email:$email, password:$pw, tenant:$tid, role:$role}')
+
+# Create the user (the API field for tenant linkage may vary per parallel workstream's
+# schema; default assumption: a single 'tenant' field with the tenant ID).
 curl -fsS -X POST "${PAYLOAD_API_URL}/api/users" \
   -H "Authorization: Bearer ${PAYLOAD_API_TOKEN}" \
   -H "Content-Type: application/json" \
-  -d "$(cat <<EOF
-{
-  "email": "admin@optidigi.nl",
-  "password": "${PW}",
-  "tenant": "<tenantId>",
-  "role": "editor"
-}
-EOF
-)"
+  -d "${USER_BODY}"
 
-# Trigger forgot-password so an email goes out regardless of auth.verify config
+# Scrub the password immediately after the only command that referenced it.
+unset PW USER_BODY
+
+# Trigger forgot-password so an email goes out regardless of auth.verify config.
+# The forgot-password call is idempotent and safe even if verify already sent one.
 curl -fsS -X POST "${PAYLOAD_API_URL}/api/users/forgot-password" \
   -H "Content-Type: application/json" \
   -d '{"email": "admin@optidigi.nl"}'
-
-unset PW
 ```
 
 If user create returns 4xx with a schema mismatch (e.g., the parallel workstream uses `tenants: [<id>]` array, or a different role enum): surface the response, escalate. Do not retry blindly.
@@ -657,7 +681,20 @@ On approval:
 ```bash
 cd /home/shimmy/Desktop/env/sitegen-cms-orchestrator/site-<slug>
 git push origin main
-gh run watch --exit-status
+
+# Capture the new HEAD sha so we watch the right run, not "the most recent
+# of any run on the repo". GHA registers the run a few seconds after push,
+# so poll briefly.
+SHA=$(git rev-parse HEAD)
+RUN_ID=""
+for i in $(seq 1 15); do
+  RUN_ID=$(gh run list --commit "$SHA" --limit 1 --json databaseId -q '.[0].databaseId')
+  [ -n "$RUN_ID" ] && break
+  sleep 2
+done
+[ -z "$RUN_ID" ] && { echo "FATAL: no GHA run for $SHA after 30s"; exit 1; }
+
+gh run watch "$RUN_ID" --exit-status
 ```
 
 If push fails (likely auth): surface and stop. Do NOT force-push.
