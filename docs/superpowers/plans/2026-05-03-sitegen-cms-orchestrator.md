@@ -153,7 +153,7 @@ You operate from the orchestrator root (the directory holding this `CLAUDE.md`).
 
 - `payload-seeder` — markdown + site-data → Payload pages, media, siteSettings via REST. Dispatch in Phase 4.
 - `site-converter` — surgical SSR conversion of the cloned site. Dispatch in Phase 5.
-- `cms-reviewer` — post-conversion audit. Dispatch in Phase 7. Uses `code-reviewer` agent type as base.
+- `cms-reviewer` — post-conversion audit. Dispatch in Phase 7.
 
 See `.claude/agents/*.md` for input/output contracts.
 
@@ -161,7 +161,7 @@ See `.claude/agents/*.md` for input/output contracts.
 
 1. Read `preflight.md` first when starting a CMS-ification. Summarize back what you understood. Wait for user confirmation.
 2. Then read `prompt.md` and run the 10-phase runbook.
-3. Never modify any of the four sibling repos (`sitegen-orchestrator`, `sitegen-template`, `sitegen-themes`, the source `site-<slug>` on disk before this run started). The cloned `./site-<slug>/` is yours to modify.
+3. Never modify any of the three sibling orchestrator repos (`sitegen-orchestrator`, `sitegen-template`, `sitegen-themes`). The cloned `./site-<slug>/` is yours to modify; nothing else in or above this working directory is.
 4. Never push to `main` of `optidigi/site-<slug>` until the user has approved the sign-off gate (Phase 9).
 5. Never delete the Payload tenant or its content during a run, including on failure. Operator's call only.
 6. Markdown files in the cloned site's `src/content/pages/` are deleted in the same commit as the SSR conversion (Phase 5). Do NOT leave them behind. Source of truth becomes Payload.
@@ -176,11 +176,13 @@ See `.claude/agents/*.md` for input/output contracts.
 - All security headers from the original `nginx.conf` are present in `src/middleware.ts`
 - `/healthz` route returns 200 unconditionally (independent of CMS data)
 - No `getEntry` / `getCollection` / `astro:content` imports remain in the codebase
-- Every reference to CMS data in templates uses defensive access patterns
+- No bare property access on CMS reader results: `grep -rEn '(getPage|getSite)\([^)]*\)\.[a-zA-Z]' src/` returns zero hits (every access goes through `?.` or destructure-with-default)
 
 ## Re-engagements
 
 If a CMS-ified site needs CMS-related changes weeks later (e.g., parallel workstream's schema changed), this orchestrator does NOT support a "patch existing CMS-ified site" mode. Operator must manually revert the site repo (`git reset --hard origin/main` after deleting local clone), delete the Payload tenant, then re-run `/add-cms <slug>`. The Phase 2 idempotency check enforces this.
+
+If the operator asks you to "patch the existing CMS" or "incrementally update the CMS-ified site", refuse and walk them through the manual revert + re-run sequence above. Do not attempt destructive recovery (`git reset --hard`, tenant deletion) on your own — the operator runs those.
 
 ## Where the design lives
 
