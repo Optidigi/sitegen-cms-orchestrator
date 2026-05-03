@@ -22,9 +22,22 @@ You are a focused subagent. You're the final pre-sign-off gate for the CMS conve
   grep -E "node\(\{[^}]*mode:\s*['\"]standalone['\"]" astro.config.mjs
   ```
 - `package.json` lists `@astrojs/node` in dependencies and has a `start` script.
-- `pnpm build` succeeds:
+- **No unexpected dependency drift.** Compare `package.json` against the pre-conversion state — only `@astrojs/node` should have been added. The pre-conversion SHA is the parent of the first commit listed in the conversion report (typically `chore: install @astrojs/node and switch to SSR output`):
   ```bash
-  cd <site-repo> && pnpm install && pnpm build
+  PRE_SHA=$(git log --reverse --format=%H | head -1)~1   # adjust if needed: should be origin/main pre-conversion
+  git diff "$PRE_SHA"..HEAD -- package.json | grep -E '^\+\s+"' | grep -v "@astrojs/node" \
+    && echo "BLOCKING: unexpected dependencies added beyond @astrojs/node" \
+    || echo "OK: only @astrojs/node added"
+  ```
+- **Working tree is clean** before running the build (a half-converted site can build successfully against dirty in-memory state):
+  ```bash
+  test -z "$(git status --porcelain)" \
+    && echo "OK: tree clean" \
+    || { echo "BLOCKING: working tree dirty — converter left uncommitted changes"; git status --short; }
+  ```
+- `pnpm build` succeeds against the locked dependency tree:
+  ```bash
+  cd <site-repo> && pnpm install --frozen-lockfile && pnpm build
   ```
   Confirm exit 0 and that `dist/server/entry.mjs` exists.
 
@@ -33,6 +46,13 @@ You are a focused subagent. You're the final pre-sign-off gate for the CMS conve
 - `src/lib/cms.ts` exists and exports `getPage`, `getSite`, `mediaPath`.
 - `src/lib/types.ts` exists and exports `Page`, `SiteSettings`, `Block`, `RichTextBlock`.
 - Both functions return `null` on error (no throws). Read the file and confirm a try/catch or equivalent guard.
+- **`cms.ts` distinguishes ENOENT from other errors** — silent on missing file (expected), `console.warn` on other read errors, `console.error` on JSON parse errors. Operators must be able to tell "no content yet" from "Payload wrote garbage":
+  ```bash
+  grep -E "ENOENT" src/lib/cms.ts >/dev/null \
+    || echo "BLOCKING: src/lib/cms.ts missing ENOENT distinction (parse errors will vanish silently)"
+  grep -Ei "JSON parse" src/lib/cms.ts >/dev/null \
+    || echo "BLOCKING: src/lib/cms.ts missing JSON parse error log"
+  ```
 
 ### Defensive rendering everywhere
 
@@ -44,13 +64,16 @@ For every file under `src/pages/`, `src/layouts/`, `src/components/seo/`, `src/c
 
 Grep for crash-inducing patterns:
 ```bash
-# Direct .data.* without optional chaining (would crash on null)
-grep -rEn "page\.[a-z]" src/pages/ src/layouts/ src/components/
-# Direct site. access without optional chaining
-grep -rEn "site\.[a-zA-Z]" src/pages/ src/layouts/ src/components/seo/
+# Direct .X without optional chaining (would crash on null)
+grep -rEn "(^|[^?])(page|site)\.[a-zA-Z_]" src/pages/ src/layouts/ src/components/
+
+# Chained access — `page?.foo.bar` would still crash if `foo` is undefined.
+# These need manual review: each hit must be either fully chained (`page?.foo?.bar`)
+# or guarded by a default earlier (`?? []` etc.).
+grep -rEn "(page|site)\?\.[a-zA-Z_]+\.[a-zA-Z_]" src/pages/ src/layouts/ src/components/
 ```
 
-For each match, verify it's defensive (e.g., `page?.title` is fine, `page.title` without the `?` is a finding).
+For each match, verify it's defensive (e.g., `page?.title` is fine, `page.title` without the `?` is a finding; `page?.blocks ?? []` is fine, `page?.blocks.map(...)` is a finding).
 
 ### Middleware sets all required security headers
 
