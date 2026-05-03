@@ -2177,9 +2177,9 @@ See `docs/superpowers/specs/2026-05-03-sitegen-cms-orchestrator-design.md` for t
 
 - A target `optidigi/site-<slug>` repo (built and deployed by `sitegen-orchestrator`).
 - A self-hosted Payload v3 instance reachable from the operator's machine (e.g. `https://cms.optidigi.nl`).
-- A Payload Management API token with scopes `tenant:create`, `user:create`, `page:create`, `media:create`, `siteSettings:create`.
+- A Payload Management API token with scopes `tenant:create`, `user:create`, `page:create`, `media:create`, `siteSettings:create`. Generate it in Payload admin → API Keys → New token, granting all five scopes; copy into `.env` (see Setup below).
 - A VPS host directory where Payload writes this tenant's content (typically `/srv/data/saas/payload-siab/<tenantId>/`). The site container will mount it read-only.
-- Local tools: `gh` (authenticated as a member of `optidigi`), `git`, `node` ≥ 20, `pnpm` (via `corepack`), `curl`, `jq`, `python3`.
+- Local tools: `gh` (authenticated as a member of `optidigi` — verify with `gh auth status`), `git`, `node` ≥ 20, `pnpm` (via `corepack`), `curl`, `jq`. (`python3` is used as an optional fallback for parsing `site.ts` if `pnpm dlx tsx` is unavailable.)
 
 ## Setup (fresh machine)
 
@@ -2217,7 +2217,7 @@ There are GATEs in phases 1, 2, 9, and 10 that require explicit operator approva
 - Subagent specs in `.claude/agents/`.
 - Slash command in `.claude/commands/`.
 - Permissions in `.claude/settings.json` (allow safe ops, deny destructive global ops, ask for remote/recoverable destructive ops).
-- Sibling repos cloned per-engagement and gitignored from this repo.
+- The site repo is cloned per-engagement (as `./site-<slug>/`) and gitignored from this repo.
 
 ## Cleanup after a run
 
@@ -2234,11 +2234,20 @@ The orchestrator never auto-deletes it.
 Not supported. The Phase 2 idempotency check bails. Manual reset path:
 
 ```bash
-# In the cloned site repo:
+# 1. Inside the cloned site repo, revert all conversion commits:
+cd ./site-<slug>
 git reset --hard origin/main
+
+# 2. Delete the local clone (Phase 2 refuses to start if it exists):
+cd ..
+rm -rf ./site-<slug>
 ```
 
-Plus delete the Payload tenant in Payload admin. Then re-run `/add-cms <slug>`.
+Then in Payload admin: delete the tenant (and confirm any associated media/users were cascade-removed — if not, delete those too).
+
+**VPS impact:** the previously-built `:latest` image is still serving editorial content from the (now-doomed) tenant's data dir. Before re-running `/add-cms <slug>`, decide whether to roll the live site back to a pre-CMS image (using a `sha-<short>` tag from `ghcr.io`) or accept that it will serve empty pages until the new conversion is pushed.
+
+Once that's done, re-run `/add-cms <slug>` from the orchestrator dir.
 ```
 
 - [ ] **Step 2: Verify**
