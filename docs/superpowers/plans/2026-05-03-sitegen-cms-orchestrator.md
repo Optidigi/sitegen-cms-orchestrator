@@ -840,7 +840,10 @@ Write `/home/shimmy/Desktop/env/sitegen-cms-orchestrator/.claude/settings.json`:
       "Bash(wc:*)",
       "Bash(stat:*)",
       "Bash(python3:*)",
-      "Bash(base64:*)"
+      "Bash(base64:*)",
+      "Bash(seq:*)",
+      "Bash(sleep:*)",
+      "Bash(tr:*)"
     ],
     "deny": [
       "Bash(rm -rf /:*)",
