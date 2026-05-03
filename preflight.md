@@ -95,4 +95,4 @@ See full contracts in `.claude/agents/*.md`.
 
 ## When you're done reading
 
-Tell the user, in your own words: (a) what the workflow does end-to-end, (b) what subagents are available and when each fires, (c) what the orchestrator never touches (the four sibling repos pre-run; the Payload tenant on failure; GitHub at content-edit time), and (d) where the per-tenant data lands and gets read from. Then ask permission to read `prompt.md` and start Phase 1.
+Tell the user, in your own words: (a) what the workflow does end-to-end, (b) what subagents are available and when each fires, (c) what the orchestrator never touches (the three sibling repos pre-run; the Payload tenant on failure; GitHub at content-edit time), and (d) where the per-tenant data lands and gets read from. Then ask permission to read `prompt.md` and start Phase 1.
