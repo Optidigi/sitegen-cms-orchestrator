@@ -2,6 +2,14 @@
 
 This document gives you the context you need to run the sitegen-cms workflow safely and well. After reading, summarize back to the user what you understood. **Do not open `prompt.md` until the user confirms.**
 
+## Environment readiness (run this first)
+
+Before reading the rest of this document, verify `gh` is authenticated. Phase 2 needs it for `gh repo clone`, Phase 9 for `gh run watch` and `gh api`. If this fails, stop and tell the operator to run `gh auth login` before retrying — there's no point continuing to read.
+
+```bash
+gh auth status >/dev/null 2>&1 || { echo "FATAL: gh is not authenticated. Run 'gh auth login' (or check 'gh auth status' for details) before retrying."; exit 1; }
+```
+
 ## Purpose
 
 Take an existing static Astro landing-page site (built and deployed by `sitegen-orchestrator`, living at `optidigi/site-<slug>`) and transform it into a CMS-backed site driven by a self-hosted Payload v3 instance. After the run:

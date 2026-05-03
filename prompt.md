@@ -8,11 +8,7 @@ The slash command was invoked as `/add-cms <slug>`. The slug is your primary ide
 
 ## Phase 1 — Intake
 
-Confirm `gh` is authenticated (Phase 2 needs it for `gh repo clone`, Phase 9 for `gh run watch` / `gh api`):
-
-```bash
-gh auth status >/dev/null 2>&1 || { echo "FATAL: gh is not authenticated. Run 'gh auth login' (or check 'gh auth status' for details) before retrying."; exit 1; }
-```
+(Note: `gh` auth was verified in `preflight.md`'s "Environment readiness" check before you got here.)
 
 Confirm `.env` in the orchestrator working dir contains the required keys:
 
