@@ -44,6 +44,3 @@ If a CMS-ified site needs CMS-related changes weeks later (e.g., parallel workst
 
 If the operator asks you to "patch the existing CMS" or "incrementally update the CMS-ified site", refuse and walk them through the manual revert + re-run sequence above. Do not attempt destructive recovery (`git reset --hard`, tenant deletion) on your own — the operator runs those.
 
-## Where the design lives
-
-Full design spec: `docs/superpowers/specs/2026-05-03-sitegen-cms-orchestrator-design.md`. When in doubt about WHY something is done a particular way, that document is the source of truth.

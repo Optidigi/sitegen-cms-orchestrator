@@ -4,8 +4,6 @@ Workflow for adding a Payload v3 CMS layer to existing static Astro landing page
 
 After running, the target site is Astro SSR (Node) reading per-tenant content from a mounted Payload data directory. Editor changes are visible on the next request — no GitHub Actions runs, no GitHub PATs, no webhook bridge in the editing path.
 
-See `docs/superpowers/specs/2026-05-03-sitegen-cms-orchestrator-design.md` for the full design.
-
 ## Prerequisites
 
 - A target `optidigi/site-<slug>` repo (built and deployed by `sitegen-orchestrator`).
