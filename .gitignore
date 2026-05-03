@@ -1,0 +1,23 @@
+# Per-engagement site clones (have their own git, gitignored from orchestrator)
+/site-*/
+
+# Per-client raw materials, wherever the user drops them locally
+/client-input/
+/_clients/
+
+# Operator secrets
+.env
+
+# Local Claude state
+.claude/projects/
+.claude/shell-snapshots/
+.claude/todos/
+.claude/statsig/
+.claude/ide/
+
+# OS / editor noise
+.DS_Store
+Thumbs.db
+*.swp
+.idea/
+.vscode/
