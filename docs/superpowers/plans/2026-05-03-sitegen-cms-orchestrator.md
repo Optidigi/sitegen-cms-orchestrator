@@ -1190,7 +1190,7 @@ Write `/home/shimmy/Desktop/env/sitegen-cms-orchestrator/.claude/agents/site-con
 ---
 name: site-converter
 description: Use during Phase 5 of the sitegen-cms runbook. Performs surgical conversion of a cloned static Astro site into an SSR site that reads CMS content from a mounted volume. Commits each logical group as its own commit. Returns a conversion report.
-tools: Read, Write, Edit, Bash
+tools: Read, Write, Edit, Bash, Glob
 ---
 
 You are a focused subagent within the sitegen-cms workflow. You convert one cloned site repo from static Astro to Astro SSR (Node, reading per-tenant JSON from a mounted volume). You commit each logical group of changes as its own commit on local `main`. You do NOT push.
@@ -1209,7 +1209,15 @@ Perform these groups in order. After each group, run the listed verification, th
 
 ### Group 1 — Install adapter and switch to SSR output
 
-Modify `astro.config.mjs`:
+**Read `astro.config.mjs` first.** The minimum required deltas are:
+
+1. Add `import node from '@astrojs/node';` (alongside the existing imports).
+2. Set `output: 'server'` (replacing whatever's there, typically `'static'`).
+3. Set `adapter: node({ mode: 'standalone' })` (add the property to the `defineConfig` argument).
+
+**Use `Edit` for these three changes**, preserving every other line of the file. The cloned site may have integrations, vite config, redirects, image config, or other properties beyond what `sitegen-template` ships — none of those should be touched.
+
+Reference target shape (sitegen-template's defaults plus the SSR additions — yours may have more):
 
 ```javascript
 import { defineConfig } from 'astro/config';
@@ -1232,6 +1240,8 @@ export default defineConfig({
   },
 });
 ```
+
+Only fall back to wholesale `Write` (with the template above) if the existing file has none of the expected `defineConfig` properties (genuinely empty or broken). If the existing file has integrations or vite config beyond what the template above shows, **preserve them** and bail with a diagnostic listing the unfamiliar entries — let the operator confirm they're CMS-safe before proceeding.
 
 Modify `package.json` — add `@astrojs/node` to dependencies and a `start` script:
 
@@ -1339,10 +1349,23 @@ import type { Page, SiteSettings } from './types';
 const DATA_DIR = process.env.CMS_DATA_DIR ?? '/data';
 
 async function readJson<T>(rel: string): Promise<T | null> {
+  let raw: string;
   try {
-    const raw = await fs.readFile(path.join(DATA_DIR, rel), 'utf8');
+    raw = await fs.readFile(path.join(DATA_DIR, rel), 'utf8');
+  } catch (err: any) {
+    // ENOENT (file missing) is the expected "no content yet" path — silent.
+    // Any other read error is unexpected — log so operators can debug.
+    if (err?.code !== 'ENOENT') {
+      console.warn(`[cms] read failed for ${rel}:`, err?.message ?? err);
+    }
+    return null;
+  }
+  try {
     return JSON.parse(raw) as T;
-  } catch {
+  } catch (err: any) {
+    // Corrupt JSON would otherwise vanish silently (page renders empty).
+    // Loud here so operators see "Payload wrote garbage" vs "no content".
+    console.error(`[cms] JSON parse failed for ${rel}:`, err?.message ?? err);
     return null;
   }
 }
@@ -1455,6 +1478,10 @@ const list = blocks ?? [];
   if (block.blockType === 'richText') {
     return <RichText heading={block.heading} body={block.body} />;
   }
+  // Unknown blockType — log so operators see when Payload introduces a
+  // type the SSR site hasn't been redeployed to handle. Render nothing
+  // (defensive) instead of throwing.
+  console.warn(`[cms/Blocks] unknown blockType: ${(block as any).blockType}`);
   return null;
 })}
 ```
@@ -1492,14 +1519,19 @@ git commit -m "feat: add cms reader, types, middleware, healthz, media route, bl
 
 ### Group 3 — Rewrite page routes to use CMS reader
 
-For each `src/pages/*.astro` that previously used `getEntry('pages', '<slug>')`:
+A **content-driven page** is any `.astro` file under `src/pages/` (including subdirectories) that imports from `astro:content` or calls `getEntry`/`getCollection`. That is the operational definition — anything else is left alone.
 
-Find them:
+Find them with `Glob` first (covers subdirectories that the bash glob misses):
+
 ```bash
-grep -l "getEntry\|getCollection\|astro:content" src/pages/*.astro
+# Glob: src/pages/**/*.astro — then for each, Read to check for astro:content
+# Bash equivalent (top-level only) for sanity:
+grep -lI "getEntry\|getCollection\|astro:content" src/pages/*.astro 2>/dev/null
 ```
 
-For each match, REWRITE (using `Edit` or `Write`) the route to use `getPage` + `Blocks`. Example for `src/pages/index.astro`:
+For each content-driven page, modify ONLY the import section and the data-flow lines (the `getEntry`/`render`/`Content` calls). **Use `Edit`, not `Write`.** Preserve any other markup the page contains — hand-written sections, custom components, theme widgets, contact-form embeds. Only the editorial-data plumbing changes.
+
+Example for `src/pages/index.astro`:
 
 Before:
 ```astro
@@ -1571,7 +1603,18 @@ git commit -m "refactor: rewrite page routes to use CMS reader"
 
 ### Group 4 — Source SEO components from CMS
 
-Modify `src/layouts/BaseLayout.astro` to read site settings from CMS instead of importing `src/content/site.ts`. Read the existing file first to understand its current shape, then update it. Pattern:
+Modify `src/layouts/BaseLayout.astro` to read site settings from CMS instead of importing `src/content/site.ts`.
+
+**Strategy: use `Edit`, not `Write`.** The cloned site's `BaseLayout.astro` may include theme-specific `<Header>`/`<Footer>` slots, analytics, font preloads, custom `<meta>` tags, body-class hooks — none of which the conversion touches. Only the following lines change:
+
+1. Replace `import { site } from '../content/site';` with `import { getSite } from '../lib/cms';`.
+2. Add `const site = await getSite();` to the frontmatter (after the `Astro.props` destructure).
+3. Wherever `site.X` is accessed in the template, change to `site?.X ?? <fallback>` (every access uses optional chaining + a meaningful default).
+4. Wherever JSON-LD components are rendered (e.g., `<JsonLdOrganization />`), wrap with `{site && <JsonLdOrganization site={site} />}` and pass `site` as a prop. Same for `<JsonLdLocalBusiness>` (also wrapped in `{site?.nap && ...}`).
+
+If the actual file's `<head>` or `<body>` contains tags or components this pattern doesn't anticipate, **leave them**. Do not "tidy" or rewrite them.
+
+Reference before/after (sitegen-template's typical shape — your actual file may have more):
 
 Before (typical shape — adapt to actual file):
 ```astro
@@ -1879,13 +1922,18 @@ After all groups, return a markdown report:
 
 End with: `**Status: clean — proceed to Phase 6 (build verify).**` if everything went smoothly.
 
+If you bailed before completing all 7 groups, list ONLY the commits actually made (do not invent ones you didn't make), and add a `## Bail` section with: which group failed, what file or condition triggered the bail, and the exact diagnostic that caused the stop. End with: `**Status: bailed at Group N — operator action required.**`
+
 ## Hard rules
 
 - **Never push.** Only local commits.
 - Never delete anything outside the explicitly enumerated paths above.
+- Never modify or delete anything under `public/`. The SEO baseline files there (`llms.txt`, `humans.txt`, `.well-known/security.txt`, favicons, manifest, og-default) must survive conversion untouched.
 - Never modify non-content components (header, footer, theme components, contact form). They render fine independent of CMS.
 - If any expected file is missing (e.g., `src/content/site.ts`), bail and report — do not invent a substitute.
 - Use `Edit` for surgical modifications to existing files; only use `Write` for new files or when wholesale replacement is unavoidable. Read files before editing them.
+- **Every reference to a `getSite()` / `getPage()` result uses `?.` or a guarded conditional.** No bare `site.X` or `page.X` access anywhere — the cms-reviewer (Phase 7) greps for these patterns and will fail the conversion otherwise.
+- **Never modify dependencies after Group 1.** The only `pnpm add` is for `@astrojs/node`. If you encounter type errors that seem to need a missing `@types/*` package, bail and report — don't install.
 - One logical group = one commit. Do NOT bundle multiple groups into one commit.
 - After each commit, do a quick `git status` to confirm the working tree is clean before moving to the next group.
 ```
