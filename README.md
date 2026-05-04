@@ -9,7 +9,7 @@ After running, the target site is Astro SSR (Node) reading per-tenant content fr
 - A target `optidigi/site-<slug>` repo (built and deployed by `sitegen-orchestrator`).
 - A self-hosted Payload v3 instance reachable from the operator's machine (e.g. `https://cms.optidigi.nl`).
 - A Payload Management API token with scopes `tenant:create`, `user:create`, `page:create`, `media:create`, `siteSettings:create`. Generate it in Payload admin → API Keys → New token, granting all five scopes; copy into `.env` (see Setup below).
-- A VPS host directory where Payload writes this tenant's content (typically `/srv/data/saas/siab-payload/tenants/<tenantId>/`). The site container will mount it read-only.
+- A VPS host directory where Payload writes this tenant's content (typically `/srv/data/saas/payload-siab/<tenantId>/`). The site container will mount it read-only.
 - Local tools: `gh` (authenticated as a member of `optidigi` — verify with `gh auth status`), `git`, `node` ≥ 20, `pnpm` (via `corepack`), `curl`, `jq`. (`python3` is used as an optional fallback for parsing `site.ts` if `pnpm dlx tsx` is unavailable.)
 
 ## Setup (fresh machine)

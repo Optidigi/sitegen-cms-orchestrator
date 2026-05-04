@@ -597,7 +597,7 @@ Create `docker-compose.cms.yml.example` at the site repo root:
 # Copy values into your VPS docker-compose file (or use this standalone if running this site alone).
 #
 # Replace <vps-data-path> with the absolute host path where Payload writes this tenant's data,
-# e.g. /srv/data/saas/siab-payload/tenants/<tenantId>.
+# e.g. /srv/data/saas/payload-siab/<tenantId>.
 
 services:
   site:
