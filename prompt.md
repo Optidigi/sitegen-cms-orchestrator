@@ -36,7 +36,7 @@ Expected: `200`. If non-200 or unreachable, bail with the URL and error.
 
 Ask the operator (one question at a time, accept "skip" to defer):
 
-1. **VPS host path for this tenant's Payload data directory.** Convention: `/srv/data/saas/payload-siab/<tenantId>` (tenant ID is filled in after Phase 3, so accept either a complete path or a path with a `<tenantId>` placeholder).
+1. **VPS host path for this tenant's Payload data directory.** Convention: `/srv/data/saas/siab-payload/tenants/<tenantId>` (tenant ID is filled in after Phase 3, so accept either a complete path or a path with a `<tenantId>` placeholder).
 2. **(Optional) Client editor email** for record-keeping. The actual Payload user is created with `admin@optidigi.nl` regardless. Operator updates the email in Payload admin after end-to-end verification.
 
 Summarize the captured intake:
@@ -147,7 +147,7 @@ PAYLOAD=$(jq -n \
   '{slug:$slug, name:$name, primaryDomain:$domain}')
 
 curl -fsS -X POST "${PAYLOAD_API_URL}/api/tenants" \
-  -H "Authorization: Bearer ${PAYLOAD_API_TOKEN}" \
+  -H "Authorization: users API-Key ${PAYLOAD_API_TOKEN}" \
   -H "Content-Type: application/json" \
   -d "${PAYLOAD}" > /tmp/tenant-create.json
 
@@ -162,7 +162,7 @@ If the response indicates "tenant already exists" (4xx with that hint), bail per
 If the operator's intake had a `<tenantId>` placeholder in the VPS data path, replace it now and confirm the resolved path back:
 
 ```
-Resolved VPS data path: /srv/data/saas/payload-siab/<tenantId>
+Resolved VPS data path: /srv/data/saas/siab-payload/tenants/<tenantId>
 ```
 
 ---
@@ -262,7 +262,7 @@ USER_BODY=$(jq -n \
 # Create the user (the API field for tenant linkage may vary per parallel workstream's
 # schema; default assumption: a single 'tenant' field with the tenant ID).
 curl -fsS -X POST "${PAYLOAD_API_URL}/api/users" \
-  -H "Authorization: Bearer ${PAYLOAD_API_TOKEN}" \
+  -H "Authorization: users API-Key ${PAYLOAD_API_TOKEN}" \
   -H "Content-Type: application/json" \
   -d "${USER_BODY}"
 

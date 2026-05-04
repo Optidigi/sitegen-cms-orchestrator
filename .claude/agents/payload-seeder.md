@@ -26,7 +26,7 @@ BODY=$(jq -n \
   --arg key2 "${value2}" \
   '{key1:$key1, key2:$key2}')
 curl -fsS -X POST "${PAYLOAD_API_URL}/api/<collection>" \
-  -H "Authorization: Bearer ${PAYLOAD_API_TOKEN}" \
+  -H "Authorization: users API-Key ${PAYLOAD_API_TOKEN}" \
   -H "Content-Type: application/json" \
   -d "${BODY}"
 ```
@@ -78,7 +78,7 @@ For each markdown page:
 
        ```bash
        RESP=$(curl -fsS -X POST "${PAYLOAD_API_URL}/api/media" \
-         -H "Authorization: Bearer ${PAYLOAD_API_TOKEN}" \
+         -H "Authorization: users API-Key ${PAYLOAD_API_TOKEN}" \
          -F "tenant=${TENANT_ID}" \
          -F "file=@${RESOLVED_PATH}")
        MEDIA_URL=$(echo "$RESP" | jq -r '.doc.url // .url')
@@ -118,7 +118,7 @@ For each markdown page:
      '{tenant:$tid, slug:$slug, title:$title, description:$desc, keywords:$keywords, ogImage:($ogImage|select(length>0)), role:$role, order:$order, blocks:$blocks}')
 
    curl -fsS -X POST "${PAYLOAD_API_URL}/api/pages" \
-     -H "Authorization: Bearer ${PAYLOAD_API_TOKEN}" \
+     -H "Authorization: users API-Key ${PAYLOAD_API_TOKEN}" \
      -H "Content-Type: application/json" \
      -d "${PAGE_BODY}"
    ```
@@ -147,7 +147,7 @@ SITE_BODY=$(jq -n \
 [ -n "${SERVICE_AREA_JSON:-}" ] && SITE_BODY=$(echo "$SITE_BODY" | jq --argjson s "$SERVICE_AREA_JSON" '. + {serviceArea:$s}')
 
 curl -fsS -X POST "${PAYLOAD_API_URL}/api/siteSettings" \
-  -H "Authorization: Bearer ${PAYLOAD_API_TOKEN}" \
+  -H "Authorization: users API-Key ${PAYLOAD_API_TOKEN}" \
   -H "Content-Type: application/json" \
   -d "${SITE_BODY}"
 ```
