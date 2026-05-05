@@ -124,8 +124,8 @@ If the original `nginx.conf` (now deleted, but reference the design spec or git 
 
 ### Compose example + env example + README
 
-- `docker-compose.cms.yml.example` exists at repo root with `volumes:`, `environment:` (CMS_DATA_DIR, CMS_TENANT_ID, SITE_URL), and a healthcheck against `/healthz`.
-- `.env.example` documents `CMS_DATA_DIR` and `CMS_TENANT_ID` (in addition to the existing `SITE_URL`).
+- `docker-compose.cms.yml.example` exists at repo root with `volumes:`, `environment:` (CMS_DATA_DIR, SITE_URL), and a healthcheck against `/healthz`.
+- `.env.example` documents `CMS_DATA_DIR` (in addition to the existing `SITE_URL`).
 - `README.md` has a "## CMS-backed mode" section.
 
 ### SEO baseline preserved (regression check)
