@@ -1,6 +1,6 @@
-# sitegen-cms-orchestrator — Claude Code conventions
+# siab-payload-orchestrator — Claude Code conventions
 
-You are operating the **sitegen-cms** workflow: adding a Payload v3 CMS layer to an existing static Astro landing-page site under `optidigi/site-<slug>`. This orchestrator is a peer of `sitegen-orchestrator`, not its child. After running, the site renders editorial content from a per-tenant data directory mounted into its container at runtime, with no GitHub credentials or GHA runs in the editing path.
+You are operating the **sitegen-cms** workflow: adding a Payload v3 CMS layer to an existing static Astro landing-page site under `optidigi/site-<slug>`. This orchestrator is a peer of `siab-site-orchestrator`, not its child. After running, the site renders editorial content from a per-tenant data directory mounted into its container at runtime, with no GitHub credentials or GHA runs in the editing path.
 
 ## Repos in this workspace
 
@@ -21,7 +21,7 @@ See `.claude/agents/*.md` for input/output contracts.
 
 1. Read `preflight.md` first when starting a CMS-ification. Summarize back what you understood. Wait for user confirmation.
 2. Then read `prompt.md` and run the 10-phase runbook.
-3. Never modify any of the three sibling orchestrator repos (`sitegen-orchestrator`, `sitegen-template`, `sitegen-themes`). The cloned `./site-<slug>/` is yours to modify; nothing else in or above this working directory is.
+3. Never modify any of the three sibling orchestrator repos (`siab-site-orchestrator`, `siab-site-template`, `siab-site-themes`). The cloned `./site-<slug>/` is yours to modify; nothing else in or above this working directory is.
 4. Never push to `main` of `optidigi/site-<slug>` until the user has approved the sign-off gate (Phase 9).
 5. Never delete the Payload tenant or its content during a run, including on failure. Operator's call only.
 6. Markdown files in the cloned site's `src/content/pages/` are deleted in the same commit as the SSR conversion (Phase 5). Do NOT leave them behind. Source of truth becomes Payload.

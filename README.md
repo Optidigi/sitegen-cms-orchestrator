@@ -1,12 +1,12 @@
-# sitegen-cms-orchestrator
+# siab-payload-orchestrator
 
-Workflow for adding a Payload v3 CMS layer to existing static Astro landing pages under `optidigi/site-<slug>`. Sibling to `optidigi/sitegen-orchestrator`.
+Workflow for adding a Payload v3 CMS layer to existing static Astro landing pages under `optidigi/site-<slug>`. Sibling to `optidigi/siab-site-orchestrator`.
 
 After running, the target site is Astro SSR (Node) reading per-tenant content from a mounted Payload data directory. Editor changes are visible on the next request — no GitHub Actions runs, no GitHub PATs, no webhook bridge in the editing path.
 
 ## Prerequisites
 
-- A target `optidigi/site-<slug>` repo (built and deployed by `sitegen-orchestrator`).
+- A target `optidigi/site-<slug>` repo (built and deployed by `siab-site-orchestrator`).
 - A self-hosted Payload v3 instance reachable from the operator's machine (e.g. `https://admin.siteinabox.nl`).
 - A Payload v3 API key for the orchestrator user (typically the `orchestrator@<your-org>` super-admin). Set on the user via the admin's API-key page; copy into `.env` (see Setup below). The orchestrator authenticates via `Authorization: users API-Key <token>` (Payload's API-key auth, not JWT) and inherits whatever access the owning user's role grants — Payload v3 has no per-token scope system.
 - A VPS host directory where Payload writes this tenant's content (typically `/srv/data/saas/siab-payload/tenants/<tenantId>/`). The site container will mount it read-only.
@@ -17,13 +17,13 @@ After running, the target site is Astro SSR (Node) reading per-tenant content fr
 Clone the orchestrator wherever you want it.
 
 ```bash
-git clone git@github.com:optidigi/sitegen-cms-orchestrator.git
-cd sitegen-cms-orchestrator
+git clone git@github.com:Optidigi/siab-payload-orchestrator.git
+cd siab-payload-orchestrator
 cp .env.example .env
 # Edit .env to set PAYLOAD_API_URL and PAYLOAD_API_TOKEN.
 ```
 
-Run Claude Code from inside `sitegen-cms-orchestrator/`.
+Run Claude Code from inside `siab-payload-orchestrator/`.
 
 ## Run a CMS-ification
 
@@ -42,7 +42,7 @@ Tell Claude `/add-cms <slug>` (e.g. `/add-cms amicare`). The agent reads `prefli
 
 There are GATEs in phases 1, 2, 9, and 10 that require explicit operator approval to proceed.
 
-## Conventions this orchestrator mirrors from sitegen-orchestrator
+## Conventions this orchestrator mirrors from siab-site-orchestrator
 
 - Workflow files: `CLAUDE.md`, `preflight.md`, `prompt.md`.
 - Subagent specs in `.claude/agents/`.

@@ -26,9 +26,9 @@ Perform these groups in order. After each group, run the listed verification, th
 2. Set `output: 'server'` (replacing whatever's there, typically `'static'`).
 3. Set `adapter: node({ mode: 'standalone' })` (add the property to the `defineConfig` argument).
 
-**Use `Edit` for these three changes**, preserving every other line of the file. The cloned site may have integrations, vite config, redirects, image config, or other properties beyond what `sitegen-template` ships — none of those should be touched.
+**Use `Edit` for these three changes**, preserving every other line of the file. The cloned site may have integrations, vite config, redirects, image config, or other properties beyond what `siab-site-template` ships — none of those should be touched.
 
-Reference target shape (sitegen-template's defaults plus the SSR additions — yours may have more):
+Reference target shape (siab-site-template's defaults plus the SSR additions — yours may have more):
 
 ```javascript
 import { defineConfig } from 'astro/config';
@@ -425,7 +425,7 @@ Modify `src/layouts/BaseLayout.astro` to read site settings from CMS instead of 
 
 If the actual file's `<head>` or `<body>` contains tags or components this pattern doesn't anticipate, **leave them**. Do not "tidy" or rewrite them.
 
-Reference before/after (sitegen-template's typical shape — your actual file may have more):
+Reference before/after (siab-site-template's typical shape — your actual file may have more):
 
 Before (typical shape — adapt to actual file):
 ```astro

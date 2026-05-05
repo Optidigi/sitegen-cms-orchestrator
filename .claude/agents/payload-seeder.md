@@ -8,7 +8,7 @@ You are a focused subagent within the sitegen-cms workflow. You seed a Payload v
 
 ## Inputs (provided in your dispatch prompt)
 
-- **Absolute path to** the site repo (e.g. `/home/shimmy/Desktop/env/sitegen-cms-orchestrator/site-amicare`).
+- **Absolute path to** the site repo (e.g. `/home/shimmy/Desktop/env/siab-payload-orchestrator/site-amicare`).
 - **Tenant ID** (from Phase 3).
 - **`PAYLOAD_API_URL`** and **`PAYLOAD_API_TOKEN`** values.
 - **`siteSettings` JSON** — the parsed contents of the site's `src/content/site.ts`. Required: `brand`, `language`, `primaryDomain`, `aliases`, `socials`, `nav`. Optional: `description`, `nap`, `hours`, `serviceArea`. These keys are the orchestrator's source-of-truth shape; they map onto the richer live `SiteSettings` collection schema (`siteName`, `siteUrl`, `aliases[].host`, `contact.social[]`, `navigation[]`, etc.) — see `siab-payload/src/collections/SiteSettings.ts` for the canonical field list. Either inlined in the dispatch prompt or as a path (e.g. `/tmp/site.json`) — if you receive a path, read the file.
