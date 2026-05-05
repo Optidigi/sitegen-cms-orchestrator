@@ -12,7 +12,7 @@ gh auth status >/dev/null 2>&1 || { echo "FATAL: gh is not authenticated. Run 'g
 
 ## Purpose
 
-Take an existing static Astro landing-page site (built and deployed by `sitegen-orchestrator`, living at `optidigi/site-<slug>`) and transform it into a CMS-backed site driven by a self-hosted Payload v3 instance. After the run:
+Take an existing static Astro landing-page site (built and deployed by `siab-site-orchestrator`, living at `optidigi/site-<slug>`) and transform it into a CMS-backed site driven by a self-hosted Payload v3 instance. After the run:
 
 - A Payload tenant exists for this site.
 - Editorial content (page text, media, brand info, NAP, socials) lives in Payload only — the markdown files in the site repo are deleted as part of the conversion.
@@ -85,7 +85,7 @@ See full contracts in `.claude/agents/*.md`.
 
 ## Repo locations & permissions
 
-- Org: `optidigi`. The site repo already exists from the prior sitegen-orchestrator run.
+- Org: `optidigi`. The site repo already exists from the prior siab-site-orchestrator run.
 - Image registry: `ghcr.io/optidigi/site-<slug>` — same as before. The new image (with SSR runtime) replaces `:latest` after sign-off push triggers GHA.
 - Payload instance: at the URL in `.env`'s `PAYLOAD_API_URL` (operator-configured, typically `https://admin.<your-domain>`, e.g. `https://admin.siteinabox.nl`).
 - Per-tenant data dir on VPS: operator-supplied at intake (typically under `/srv/data/saas/siab-payload/tenants/<tenantId>/`).
