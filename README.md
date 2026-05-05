@@ -10,7 +10,7 @@ After running, the target site is Astro SSR (Node) reading per-tenant content fr
 - A self-hosted Payload v3 instance reachable from the operator's machine (e.g. `https://admin.siteinabox.nl`).
 - A Payload v3 API key for the orchestrator user (typically the `orchestrator@<your-org>` super-admin). Set on the user via the admin's API-key page; copy into `.env` (see Setup below). The orchestrator authenticates via `Authorization: users API-Key <token>` (Payload's API-key auth, not JWT) and inherits whatever access the owning user's role grants — Payload v3 has no per-token scope system.
 - A VPS host directory where Payload writes this tenant's content (typically `/srv/data/saas/siab-payload/tenants/<tenantId>/`). The site container will mount it read-only.
-- Local tools: `gh` (authenticated as a member of `optidigi` — verify with `gh auth status`), `git`, `node` ≥ 20, `pnpm` (via `corepack`), `curl`, `jq`. (`python3` is used as an optional fallback for parsing `site.ts` if `pnpm dlx tsx` is unavailable.)
+- Local tools: `gh` (authenticated as a member of `optidigi` — verify with `gh auth status`), `git`, `node` ≥ 20, `pnpm` (via `corepack`), `curl`, `jq`. (`python3` is used as an optional fallback for parsing `site.ts` if `pnpm dlx tsx` is unavailable. `npx` is used by `payload-seeder` to resolve `marked` on demand for markdown→HTML conversion of richText block bodies — no separate install needed; ships with `node`.)
 
 ## Setup (fresh machine)
 
