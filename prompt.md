@@ -36,7 +36,7 @@ Expected: `200`. If non-200 or unreachable, bail with the URL and error.
 
 Ask the operator (one question at a time, accept "skip" to defer):
 
-1. **VPS host path for this tenant's Payload data directory.** Convention: `/srv/data/saas/payload-siab/<tenantId>` (tenant ID is filled in after Phase 3, so accept either a complete path or a path with a `<tenantId>` placeholder).
+1. **VPS host path for this tenant's Payload data directory.** Convention: `/srv/data/saas/siab-payload/tenants/<tenantId>` (tenant ID is filled in after Phase 3, so accept either a complete path or a path with a `<tenantId>` placeholder).
 2. **(Optional) Client editor email** for record-keeping. The actual Payload user is created with `admin@optidigi.nl` regardless. Operator updates the email in Payload admin after end-to-end verification.
 
 Summarize the captured intake:
@@ -144,10 +144,10 @@ PAYLOAD=$(jq -n \
   --arg slug   "<slug>" \
   --arg name   "<brand from Phase 2>" \
   --arg domain "<primaryDomain from Phase 2>" \
-  '{slug:$slug, name:$name, primaryDomain:$domain}')
+  '{slug:$slug, name:$name, domain:$domain, status:"active"}')
 
 curl -fsS -X POST "${PAYLOAD_API_URL}/api/tenants" \
-  -H "Authorization: Bearer ${PAYLOAD_API_TOKEN}" \
+  -H "Authorization: users API-Key ${PAYLOAD_API_TOKEN}" \
   -H "Content-Type: application/json" \
   -d "${PAYLOAD}" > /tmp/tenant-create.json
 
@@ -162,7 +162,7 @@ If the response indicates "tenant already exists" (4xx with that hint), bail per
 If the operator's intake had a `<tenantId>` placeholder in the VPS data path, replace it now and confirm the resolved path back:
 
 ```
-Resolved VPS data path: /srv/data/saas/payload-siab/<tenantId>
+Resolved VPS data path: /srv/data/saas/siab-payload/tenants/<tenantId>
 ```
 
 ---
@@ -257,12 +257,14 @@ USER_BODY=$(jq -n \
   --arg pw    "${PW}" \
   --arg tid   "${TENANT_ID}" \
   --arg role  "editor" \
-  '{email:$email, password:$pw, tenant:$tid, role:$role}')
+  '{email:$email, password:$pw, role:$role, tenants:[{tenant:$tid}]}')
 
-# Create the user (the API field for tenant linkage may vary per parallel workstream's
-# schema; default assumption: a single 'tenant' field with the tenant ID).
+# Create the user. The Users collection requires `tenants: [{tenant: <id>}]`
+# (an array of one membership) for non-super-admin roles — the validator on
+# the live collection enforces `tenants.length === 1`. A bare `tenant: <id>`
+# field will 400.
 curl -fsS -X POST "${PAYLOAD_API_URL}/api/users" \
-  -H "Authorization: Bearer ${PAYLOAD_API_TOKEN}" \
+  -H "Authorization: users API-Key ${PAYLOAD_API_TOKEN}" \
   -H "Content-Type: application/json" \
   -d "${USER_BODY}"
 
@@ -276,7 +278,7 @@ curl -fsS -X POST "${PAYLOAD_API_URL}/api/users/forgot-password" \
   -d '{"email": "admin@optidigi.nl"}'
 ```
 
-If user create returns 4xx with a schema mismatch (e.g., the parallel workstream uses `tenants: [<id>]` array, or a different role enum): surface the response, escalate. Do not retry blindly.
+If user create returns 4xx with a schema mismatch (e.g., a different role enum, or a future change to the tenants membership shape): surface the response, escalate. Do not retry blindly.
 
 ---
 
@@ -303,7 +305,6 @@ Drop-in snippet — add to your VPS compose for this site:
         - <vps-data-path-from-intake>:/data:ro
       environment:
         CMS_DATA_DIR: /data
-        CMS_TENANT_ID: <tenantId>
         SITE_URL: https://<primaryDomain>
 ```
 
@@ -380,7 +381,7 @@ If any step fails, diagnose:
 
 Common failure modes:
 - Volume not mounted → operator's compose missed the `volumes:` block.
-- Wrong `CMS_TENANT_ID` → operator typo.
+- Wrong VPS data path → operator's compose mount points at the wrong tenant subdir under `/srv/data/saas/siab-payload/tenants/<tenantId>/`.
 - Payload's afterChange not configured to write to the same path → parallel workstream issue, escalate.
 
 When the round-trip works, confirm to the operator:

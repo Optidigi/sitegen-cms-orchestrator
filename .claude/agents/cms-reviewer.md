@@ -75,6 +75,19 @@ grep -rEn "(page|site)\?\.[a-zA-Z_]+\.[a-zA-Z_]" src/pages/ src/layouts/ src/com
 
 For each match, verify it's defensive (e.g., `page?.title` is fine, `page.title` without the `?` is a finding; `page?.blocks ?? []` is fine, `page?.blocks.map(...)` is a finding).
 
+### No reliance on Payload-internal `id` fields inside array rows
+
+The `siab-payload` projector (the afterChange hook that writes per-tenant JSON to disk) strips Payload-internal `id` fields from rows inside known array fields — `blocks`, `items`, `features`, `fields`, `navigation`, `social`, `aliases`, `hours`, `serviceArea` — and drops empty `blockName` values. The on-disk JSON the SSR site reads will NOT have `b.id` or `item.id` on those rows.
+
+So Astro components must NOT key on `b.id` (or any per-row `id`) when iterating these arrays — use the array index or a content-derived key instead:
+
+```bash
+# Flag any .map(...) over a known array field that uses .id as a React/Astro key.
+grep -rEn "\.(blocks|items|features|fields|navigation|social|aliases|hours|serviceArea)\??\.map\([^)]*\bid\b" src/
+```
+
+Hits here are blocking unless the component clearly uses `idx` (the index) or a content hash (e.g., `b.heading`) as the key.
+
 ### Middleware sets all required security headers
 
 Read `src/middleware.ts`. Confirm all five headers are set on every response:
