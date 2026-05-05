@@ -100,14 +100,14 @@ For each markdown page:
 
    The live `RichText.body` field on `siab-payload`'s `pages` collection is a plain `textarea` rendered via `set:html` on the SSR side, so the body must be **HTML, not markdown**. Lexical is configured for the global `lexicalEditor` but is NOT used by the `richText` block — ship plain HTML.
 
-   Convert the per-section markdown to HTML before packing it into the block:
+   Convert the per-section markdown to HTML before packing it into the block. The orchestrator standardizes on **`marked`** (resolved on demand via `npx`) — no system install required (covered by the `node`/`pnpm` prereq) and produces the bare HTML fragment Payload needs:
 
    ```bash
    # After extracting the per-section markdown into $MD_BODY:
-   HTML_BODY=$(printf '%s' "$MD_BODY" | pandoc -f markdown -t html)
+   HTML_BODY=$(printf '%s' "$MD_BODY" | npx --yes marked)
    ```
 
-   If `pandoc` isn't available at runtime, fall back to `npx --yes marked` or any other md→html tool that emits a fragment (no `<html>` / `<body>` wrappers). Whatever you use, the `body` value posted to Payload must be an HTML string.
+   The `body` value POSTed to Payload must be an HTML string (no `<html>` / `<body>` wrappers — `marked` already produces a fragment by default). If `marked` ever fails (e.g. offline operator without the package cached), the seeder should surface the error and stop — do NOT POST raw markdown.
 
    Edge cases:
    - **Content before the first H2** (intro paragraphs after the H1): wrap in a leading block with `heading: ""` and the body as the HTML of that pre-H2 section.

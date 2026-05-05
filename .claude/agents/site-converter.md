@@ -597,7 +597,7 @@ Create `docker-compose.cms.yml.example` at the site repo root:
 # Copy values into your VPS docker-compose file (or use this standalone if running this site alone).
 #
 # Replace <vps-data-path> with the absolute host path where Payload writes this tenant's data,
-# e.g. /srv/data/saas/payload-siab/<tenantId>.
+# e.g. /srv/data/saas/siab-payload/tenants/<tenantId>.
 
 services:
   site:
@@ -609,7 +609,6 @@ services:
       - <vps-data-path>:/data:ro
     environment:
       CMS_DATA_DIR: /data
-      CMS_TENANT_ID: <tenantId>
       SITE_URL: https://<primaryDomain>
     healthcheck:
       test: ["CMD", "wget", "-qO-", "http://127.0.0.1:4321/healthz"]
@@ -623,7 +622,6 @@ Modify `.env.example` (read it first; preserve existing content). Append:
 ```
 # CMS runtime (read by the SSR server)
 CMS_DATA_DIR=/data
-CMS_TENANT_ID=
 ```
 
 Append to `README.md` (read first; preserve existing content):
@@ -637,7 +635,6 @@ This site reads editorial content from a per-tenant Payload CMS data directory m
 **Required runtime env:**
 
 - `CMS_DATA_DIR` — defaults to `/data`. Where the per-tenant data is mounted.
-- `CMS_TENANT_ID` — the Payload tenant ID for this site (set during CMS provisioning).
 - `SITE_URL` — public site URL (e.g. `https://example.com`).
 
 **Required volume:**
