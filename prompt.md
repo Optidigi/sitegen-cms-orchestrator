@@ -144,10 +144,10 @@ PAYLOAD=$(jq -n \
   --arg slug   "<slug>" \
   --arg name   "<brand from Phase 2>" \
   --arg domain "<primaryDomain from Phase 2>" \
-  '{slug:$slug, name:$name, primaryDomain:$domain}')
+  '{slug:$slug, name:$name, domain:$domain, status:"active"}')
 
 curl -fsS -X POST "${PAYLOAD_API_URL}/api/tenants" \
-  -H "Authorization: Bearer ${PAYLOAD_API_TOKEN}" \
+  -H "Authorization: users API-Key ${PAYLOAD_API_TOKEN}" \
   -H "Content-Type: application/json" \
   -d "${PAYLOAD}" > /tmp/tenant-create.json
 
@@ -257,12 +257,14 @@ USER_BODY=$(jq -n \
   --arg pw    "${PW}" \
   --arg tid   "${TENANT_ID}" \
   --arg role  "editor" \
-  '{email:$email, password:$pw, tenant:$tid, role:$role}')
+  '{email:$email, password:$pw, role:$role, tenants:[{tenant:$tid}]}')
 
-# Create the user (the API field for tenant linkage may vary per parallel workstream's
-# schema; default assumption: a single 'tenant' field with the tenant ID).
+# Create the user. The Users collection requires `tenants: [{tenant: <id>}]`
+# (an array of one membership) for non-super-admin roles — the validator on
+# the live collection enforces `tenants.length === 1`. A bare `tenant: <id>`
+# field will 400.
 curl -fsS -X POST "${PAYLOAD_API_URL}/api/users" \
-  -H "Authorization: Bearer ${PAYLOAD_API_TOKEN}" \
+  -H "Authorization: users API-Key ${PAYLOAD_API_TOKEN}" \
   -H "Content-Type: application/json" \
   -d "${USER_BODY}"
 
@@ -276,7 +278,7 @@ curl -fsS -X POST "${PAYLOAD_API_URL}/api/users/forgot-password" \
   -d '{"email": "admin@optidigi.nl"}'
 ```
 
-If user create returns 4xx with a schema mismatch (e.g., the parallel workstream uses `tenants: [<id>]` array, or a different role enum): surface the response, escalate. Do not retry blindly.
+If user create returns 4xx with a schema mismatch (e.g., a different role enum, or a future change to the tenants membership shape): surface the response, escalate. Do not retry blindly.
 
 ---
 
