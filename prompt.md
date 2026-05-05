@@ -36,7 +36,7 @@ Expected: `200`. If non-200 or unreachable, bail with the URL and error.
 
 Ask the operator (one question at a time, accept "skip" to defer):
 
-1. **VPS host path for this tenant's Payload data directory.** Convention: `/srv/data/saas/payload-siab/<tenantId>` (tenant ID is filled in after Phase 3, so accept either a complete path or a path with a `<tenantId>` placeholder).
+1. **VPS host path for this tenant's Payload data directory.** Convention: `/srv/data/saas/siab-payload/tenants/<tenantId>` (tenant ID is filled in after Phase 3, so accept either a complete path or a path with a `<tenantId>` placeholder).
 2. **(Optional) Client editor email** for record-keeping. The actual Payload user is created with `admin@optidigi.nl` regardless. Operator updates the email in Payload admin after end-to-end verification.
 
 Summarize the captured intake:
@@ -162,7 +162,7 @@ If the response indicates "tenant already exists" (4xx with that hint), bail per
 If the operator's intake had a `<tenantId>` placeholder in the VPS data path, replace it now and confirm the resolved path back:
 
 ```
-Resolved VPS data path: /srv/data/saas/payload-siab/<tenantId>
+Resolved VPS data path: /srv/data/saas/siab-payload/tenants/<tenantId>
 ```
 
 ---
@@ -305,7 +305,6 @@ Drop-in snippet — add to your VPS compose for this site:
         - <vps-data-path-from-intake>:/data:ro
       environment:
         CMS_DATA_DIR: /data
-        CMS_TENANT_ID: <tenantId>
         SITE_URL: https://<primaryDomain>
 ```
 
@@ -382,7 +381,7 @@ If any step fails, diagnose:
 
 Common failure modes:
 - Volume not mounted → operator's compose missed the `volumes:` block.
-- Wrong `CMS_TENANT_ID` → operator typo.
+- Wrong VPS data path → operator's compose mount points at the wrong tenant subdir under `/srv/data/saas/siab-payload/tenants/<tenantId>/`.
 - Payload's afterChange not configured to write to the same path → parallel workstream issue, escalate.
 
 When the round-trip works, confirm to the operator:
