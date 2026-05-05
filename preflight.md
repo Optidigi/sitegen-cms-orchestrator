@@ -31,7 +31,7 @@ optidigi/site-<slug> (existing, static)
         ▼
 this orchestrator clones it to ./site-<slug>/
         │
-        ├─→ POST tenant + pages + media + siteSettings to Payload (cms.optidigi.nl)
+        ├─→ POST tenant + pages + media + siteSettings to Payload (admin.siteinabox.nl)
         │       │
         │       │ Payload's afterChange hook writes per-tenant JSON to:
         │       │   /srv/data/saas/siab-payload/tenants/<tenantId>/{pages,site.json,media}/
@@ -87,7 +87,7 @@ See full contracts in `.claude/agents/*.md`.
 
 - Org: `optidigi`. The site repo already exists from the prior sitegen-orchestrator run.
 - Image registry: `ghcr.io/optidigi/site-<slug>` — same as before. The new image (with SSR runtime) replaces `:latest` after sign-off push triggers GHA.
-- Payload instance: at the URL in `.env`'s `PAYLOAD_API_URL` (operator-configured, typically `https://cms.optidigi.nl`).
+- Payload instance: at the URL in `.env`'s `PAYLOAD_API_URL` (operator-configured, typically `https://admin.<your-domain>`, e.g. `https://admin.siteinabox.nl`).
 - Per-tenant data dir on VPS: operator-supplied at intake (typically under `/srv/data/saas/siab-payload/tenants/<tenantId>/`).
 - VPS-side `docker compose pull && up -d` plus the volume-mount edit are server-side. Don't SSH; you can help the user diagnose.
 
