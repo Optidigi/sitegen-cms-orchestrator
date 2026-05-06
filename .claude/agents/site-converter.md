@@ -102,13 +102,24 @@ Create `src/lib/types.ts`:
 ```ts
 // src/lib/types.ts — auto-scaffolded shape; mirrors siab-payload/src/blocks/*.ts.
 
+// Upload fields are projected to disk by Payload's `projectPageToDisk` hook
+// with depth>=1, so they arrive as full Media-like objects (not bare ids).
+// MediaRef accepts either shape so the renderer can degrade gracefully if
+// a tenant's data was projected without depth, but production sites should
+// always carry the populated object (with `.url`).
+export type MediaRef =
+  | number
+  | string
+  | { id: number | string; url?: string | null; filename?: string | null; alt?: string | null }
+  | null
+
 export type HeroBlock = {
   blockType: "hero"
   eyebrow?: string | null
   headline: string
   subheadline?: string | null
   cta?: { label?: string | null; href?: string | null } | null
-  image?: number | string | null  // Media id; resolved by Blocks.astro
+  image?: MediaRef  // populated Media object (preferred) or bare id; resolved by Blocks.astro
 }
 
 export type FeatureListBlock = {
@@ -129,7 +140,7 @@ export type TestimonialsBlock = {
     quote: string
     author: string
     role?: string | null
-    avatar?: number | string | null  // Media id
+    avatar?: MediaRef  // populated Media object (preferred) or bare id
   }>
 }
 
@@ -379,15 +390,16 @@ import CTA from "./CTA.tsx"
 import RichText from "./RichText.tsx"
 import ContactSection from "./ContactSection.tsx"
 import { BlockErrorBoundary } from "./BlockErrorBoundary.tsx"
-import type { Block } from "../../lib/types"
+import type { Block, MediaRef } from "../../lib/types"
 
 interface Props {
   blocks?: Block[] | null
-  // resolveMedia takes a Media id and returns a URL string. Production
-  // resolves to tenant disk path (`/media/<id>/file.<ext>`); preview-mode
-  // resolves to CMS origin (`<PUBLIC_CMS_ORIGIN>/api/media/<id>/file`).
-  // Default = production resolver.
-  resolveMedia?: (id: number | string | null | undefined) => string | null
+  // resolveMedia takes a populated MediaRef (or bare id) and returns a URL
+  // string. Production: when projectPageToDisk runs at depth>=1, upload
+  // fields are populated Media objects — the default resolver just reads
+  // the `.url` field. Preview-mode can override to rewrite URLs to the
+  // CMS origin. Default = production resolver.
+  resolveMedia?: (ref: MediaRef) => string | null
   // hydrate=true wraps each block in `<Component client:load>` so the
   // /__preview route can swap props via React reconciliation. Default
   // false = pure SSR with 0 KB JS on tenant pages.
@@ -396,7 +408,18 @@ interface Props {
 
 const { blocks, resolveMedia, hydrate = false } = Astro.props
 const list = blocks ?? []
-const resolve = resolveMedia ?? ((id) => (id == null ? null : `/media/${id}/file.jpg`))
+// Default resolver: prefer the populated `.url` from a Media-like object.
+// If only a bare id is present, return null — we have no extension info,
+// so guessing (e.g. `.jpg`) would 404 for png/webp/svg uploads. Production
+// projection always populates the object, so the null branch only fires
+// for malformed data; renderers gracefully omit the image in that case.
+const resolve =
+  resolveMedia ??
+  ((ref: MediaRef) => {
+    if (ref == null) return null
+    if (typeof ref === "object" && "url" in ref && ref.url) return ref.url
+    return null
+  })
 ---
 
 {
