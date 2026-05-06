@@ -18,48 +18,53 @@ Perform these groups in order. After each group, run the listed verification, th
 
 ---
 
-### Group 1 — Install adapter and switch to SSR output
+### Group 1 — Dependencies + Astro config (single carve-out window)
 
 **Read `astro.config.mjs` first.** The minimum required deltas are:
 
-1. Add `import node from '@astrojs/node';` (alongside the existing imports).
+1. Add `import node from '@astrojs/node';` and `import preact from '@astrojs/preact';` (alongside the existing imports).
 2. Set `output: 'server'` (replacing whatever's there, typically `'static'`).
 3. Set `adapter: node({ mode: 'standalone' })` (add the property to the `defineConfig` argument).
+4. Add `preact({ compat: false, include: ["**/components/cms/**", "**/components/preview/**"] })` to the `integrations` array.
 
-**Use `Edit` for these three changes**, preserving every other line of the file. The cloned site may have integrations, vite config, redirects, image config, or other properties beyond what `sitegen-template` ships — none of those should be touched.
+**Use `Edit` for these changes**, preserving every other line of the file. The cloned site may have integrations, vite config, redirects, image config, or other properties beyond what `sitegen-template` ships — none of those should be touched.
 
-Reference target shape (sitegen-template's defaults plus the SSR additions — yours may have more):
+Install ALL dependencies in Group 1. Never modify dependencies after Group 1
+(carve-out: `@astrojs/preact` and `preact` are sibling installs of
+`@astrojs/node`, added for the live-preview block-renderer story; this
+is a one-time exception, not a precedent for arbitrary deps).
 
-```javascript
-import { defineConfig } from 'astro/config';
-import sitemap from '@astrojs/sitemap';
-import tailwindcss from '@tailwindcss/vite';
-import node from '@astrojs/node';
+Run from the cloned site repo root:
 
-const SITE_URL = process.env.SITE_URL ?? 'https://example.com';
+```bash
+pnpm add @astrojs/node @astrojs/preact preact
+```
+
+Then update `astro.config.mjs`:
+
+```js
+import { defineConfig } from "astro/config"
+import sitemap from "@astrojs/sitemap"
+import node from "@astrojs/node"
+import preact from "@astrojs/preact"
 
 export default defineConfig({
-  site: SITE_URL,
-  output: 'server',
-  adapter: node({ mode: 'standalone' }),
-  integrations: [sitemap()],
-  vite: {
-    plugins: [tailwindcss()],
-  },
-  build: {
-    inlineStylesheets: 'auto',
-  },
-});
+  site: "https://<primaryDomain>",
+  output: "server",
+  adapter: node({ mode: "standalone" }),
+  integrations: [
+    sitemap(),
+    preact({
+      compat: false,
+      include: ["**/components/cms/**", "**/components/preview/**"],
+    }),
+  ],
+})
 ```
 
 Only fall back to wholesale `Write` (with the template above) if the existing file has none of the expected `defineConfig` properties (genuinely empty or broken). If the existing file has integrations or vite config beyond what the template above shows, **preserve them** and bail with a diagnostic listing the unfamiliar entries — let the operator confirm they're CMS-safe before proceeding.
 
-Modify `package.json` — add `@astrojs/node` to dependencies and a `start` script:
-
-```bash
-cd <site-repo>
-pnpm add @astrojs/node
-```
+Modify `package.json` — verify the new deps landed and a `start` script exists:
 
 Then verify the `start` script in `package.json`:
 
@@ -81,7 +86,7 @@ Verify: `cat astro.config.mjs | grep -E "output:|adapter:" ` shows `output: 'ser
 Commit:
 ```bash
 git add astro.config.mjs package.json pnpm-lock.yaml
-git commit -m "chore: install @astrojs/node and switch to SSR output"
+git commit -m "chore: install @astrojs/node + @astrojs/preact and switch to SSR output"
 ```
 
 ---
@@ -688,7 +693,7 @@ After all groups, return a markdown report:
 # Conversion report — site-<slug>
 
 ## Commits
-- <sha> chore: install @astrojs/node and switch to SSR output
+- <sha> chore: install @astrojs/node + @astrojs/preact and switch to SSR output
 - <sha> feat: add cms reader, types, middleware, healthz, media route, blocks renderer
 - <sha> refactor: rewrite page routes to use CMS reader
 - <sha> refactor: source SEO components from CMS instead of site.ts
@@ -741,6 +746,6 @@ If you bailed before completing all 7 groups, list ONLY the commits actually mad
 - If any expected file is missing (e.g., `src/content/site.ts`), bail and report — do not invent a substitute.
 - Use `Edit` for surgical modifications to existing files; only use `Write` for new files or when wholesale replacement is unavoidable. Read files before editing them.
 - **Every reference to a `getSite()` / `getPage()` result uses `?.` or a guarded conditional.** No bare `site.X` or `page.X` access anywhere — the cms-reviewer (Phase 7) greps for these patterns and will fail the conversion otherwise.
-- **Never modify dependencies after Group 1.** The only `pnpm add` is for `@astrojs/node`. If you encounter type errors that seem to need a missing `@types/*` package, bail and report — don't install.
+- **Never modify dependencies after Group 1.** Group 1's only `pnpm add` covers `@astrojs/node @astrojs/preact preact` together (carve-out: `@astrojs/preact` and `preact` are sibling installs of `@astrojs/node`, added for the live-preview block-renderer story; this is a one-time exception, not a precedent for arbitrary deps). If you encounter type errors that seem to need a missing `@types/*` package, bail and report — don't install.
 - One logical group = one commit. Do NOT bundle multiple groups into one commit.
 - After each commit, do a quick `git status` to confirm the working tree is clean before moving to the next group.
