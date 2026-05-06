@@ -27,12 +27,14 @@ Perform these groups in order. After each group, run the listed verification, th
 3. Set `adapter: node({ mode: 'standalone' })` (add the property to the `defineConfig` argument).
 4. Add `preact({ compat: false, include: ["**/components/cms/**", "**/components/preview/**"] })` to the `integrations` array.
 
-**Use `Edit` for these changes**, preserving every other line of the file. The cloned site may have integrations, vite config, redirects, image config, or other properties beyond what `sitegen-template` ships — none of those should be touched. In particular, Tailwind is already configured via the `sitegen-template` (`@tailwindcss/vite` import + `vite.plugins: [tailwindcss()]`) — preserve that import and the existing `vite.plugins` entry when patching; the example codeblock below shows the expected post-patch shape.
+**Use `Edit` for these changes**, preserving every other line of the file. The cloned site may have integrations, vite config, redirects, image config, or other properties beyond what `siab-site-template` ships — none of those should be touched. In particular, Tailwind is already configured via `siab-site-template` (`@tailwindcss/vite` import + `vite.plugins: [tailwindcss()]`) — preserve that import and the existing `vite.plugins` entry when patching; the example codeblock below shows the expected post-patch shape.
 
 Install ALL dependencies in Group 1. Never modify dependencies after Group 1
 (carve-out: `@astrojs/preact` and `preact` are sibling installs of
 `@astrojs/node`, added for the live-preview block-renderer story; this
 is a one-time exception, not a precedent for arbitrary deps).
+
+Reference target shape (siab-site-template's defaults plus the SSR additions — yours may have more):
 
 Run from the cloned site repo root:
 
@@ -623,7 +625,7 @@ Modify `src/layouts/BaseLayout.astro` to read site settings from CMS instead of 
 
 If the actual file's `<head>` or `<body>` contains tags or components this pattern doesn't anticipate, **leave them**. Do not "tidy" or rewrite them.
 
-Reference before/after (sitegen-template's typical shape — your actual file may have more):
+Reference before/after (siab-site-template's typical shape — your actual file may have more):
 
 Before (typical shape — adapt to actual file):
 ```astro

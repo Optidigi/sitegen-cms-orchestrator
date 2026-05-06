@@ -10,10 +10,23 @@ The slash command was invoked as `/add-cms <slug>`. The slug is your primary ide
 
 (Note: `gh` auth was verified in `preflight.md`'s "Environment readiness" check before you got here.)
 
+Capture the orchestrator's absolute path once. All later phases use
+`${ORCH_ROOT}` instead of hardcoded paths so the runbook works on any
+operator's machine (Linux, macOS, Windows-via-Git-Bash).
+
+```bash
+ORCH_ROOT="$(pwd)"
+[ -f preflight.md ] && [ -f prompt.md ] && [ -d .claude ] || {
+  echo "FATAL: this script must be run from the siab-payload-orchestrator repo root"
+  exit 1
+}
+export ORCH_ROOT
+```
+
 Confirm `.env` in the orchestrator working dir contains the required keys:
 
 ```bash
-cd /home/shimmy/Desktop/env/sitegen-cms-orchestrator
+cd "${ORCH_ROOT}"
 test -f .env && grep -q '^PAYLOAD_API_URL=' .env && grep -q '^PAYLOAD_API_TOKEN=' .env && echo OK
 ```
 
@@ -59,7 +72,7 @@ Client editor email:   <as supplied or "n/a">
 Verify the orchestrator working dir doesn't already have `./site-<slug>/`:
 
 ```bash
-cd /home/shimmy/Desktop/env/sitegen-cms-orchestrator
+cd "${ORCH_ROOT}"
 test ! -e site-<slug> || { echo "FATAL: ./site-<slug>/ already exists. Remove it or work in a different orchestrator clone."; exit 1; }
 ```
 
@@ -137,7 +150,7 @@ Pages (N):
 Build the request body via `jq -n` so brand/domain values containing quotes or shell metacharacters can't break the JSON or get expanded:
 
 ```bash
-cd /home/shimmy/Desktop/env/sitegen-cms-orchestrator
+cd "${ORCH_ROOT}"
 set -a; source .env; set +a
 
 PAYLOAD=$(jq -n \
@@ -171,7 +184,7 @@ Resolved VPS data path: /srv/data/saas/siab-payload/tenants/<tenantId>
 
 Dispatch the `payload-seeder` subagent. The dispatch prompt must include:
 
-- Absolute site repo path: `/home/shimmy/Desktop/env/sitegen-cms-orchestrator/site-<slug>`
+- Site repo path: `${ORCH_ROOT}/site-<slug>`
 - Tenant ID (`${TENANT_ID}` from Phase 3)
 - `PAYLOAD_API_URL` and `PAYLOAD_API_TOKEN` values
 - The parsed siteSettings JSON — read `/tmp/site.json` produced in Phase 2 and embed it (or paste as a JSON blob in the dispatch prompt)
@@ -198,7 +211,7 @@ Dispatch the `site-converter` subagent. The dispatch prompt must include:
 Wait for the subagent's report. It will have made multiple commits on local `main`. Verify with:
 
 ```bash
-cd /home/shimmy/Desktop/env/sitegen-cms-orchestrator/site-<slug>
+cd "${ORCH_ROOT}/site-<slug>"
 git log --oneline -10
 ```
 
@@ -211,7 +224,7 @@ If the subagent bailed mid-conversion: surface the report, advise operator to ma
 ## Phase 6 — Build verify
 
 ```bash
-cd /home/shimmy/Desktop/env/sitegen-cms-orchestrator/site-<slug>
+cd "${ORCH_ROOT}/site-<slug>"
 pnpm install
 pnpm build
 ```
@@ -244,7 +257,7 @@ After 2 unsuccessful loops, escalate to the operator with the latest review and 
 ## Phase 8 — Invite editor
 
 ```bash
-cd /home/shimmy/Desktop/env/sitegen-cms-orchestrator
+cd "${ORCH_ROOT}"
 set -a; source .env; set +a
 
 # Generate a random password (never logged or surfaced)
@@ -287,7 +300,7 @@ If user create returns 4xx with a schema mismatch (e.g., a different role enum, 
 Print to operator:
 
 ```bash
-cd /home/shimmy/Desktop/env/sitegen-cms-orchestrator/site-<slug>
+cd "${ORCH_ROOT}/site-<slug>"
 git log --oneline origin/main..HEAD
 git diff origin/main..HEAD --stat
 ```
@@ -327,7 +340,7 @@ Payload admin: ${PAYLOAD_API_URL}/admin/collections/pages?where[tenant][equals]=
 On approval:
 
 ```bash
-cd /home/shimmy/Desktop/env/sitegen-cms-orchestrator/site-<slug>
+cd "${ORCH_ROOT}/site-<slug>"
 git push origin main
 
 # Capture the new HEAD sha so we watch the right run, not "the most recent
