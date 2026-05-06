@@ -199,29 +199,51 @@ export function mediaPath(file: string): string {
 }
 ```
 
-Create `src/middleware.ts`:
+Create `src/middleware.ts`. The middleware sets strict security headers by default, but relaxes `X-Frame-Options` and `frame-ancestors` for the `/__preview` route family so the admin origin can iframe live previews. All other routes keep the strict defaults (DENY framing, `frame-ancestors 'none'`).
 
-```typescript
-import { defineMiddleware } from 'astro:middleware';
+```ts
+// src/middleware.ts
+import { defineMiddleware } from "astro:middleware"
 
-export const onRequest = defineMiddleware(async (_ctx, next) => {
-  const response = await next();
-  response.headers.set('X-Content-Type-Options', 'nosniff');
-  response.headers.set('X-Frame-Options', 'DENY');
-  response.headers.set('Referrer-Policy', 'strict-origin-when-cross-origin');
-  response.headers.set(
-    'Content-Security-Policy',
-    "default-src 'self'; img-src 'self' data: https:; style-src 'self' 'unsafe-inline'; font-src 'self' data:; script-src 'self'; object-src 'none'; base-uri 'self'; frame-ancestors 'none'",
-  );
-  response.headers.set(
-    'Permissions-Policy',
-    'camera=(), microphone=(), geolocation=(), interest-cohort=()',
-  );
-  return response;
-});
+const ADMIN_ORIGIN = process.env.PUBLIC_ADMIN_ORIGIN ?? "https://admin.siteinabox.nl"
+
+export const onRequest = defineMiddleware(async (ctx, next) => {
+  const res = await next()
+
+  // Common security headers (unchanged from prior version).
+  res.headers.set("X-Content-Type-Options", "nosniff")
+  res.headers.set("Referrer-Policy", "strict-origin-when-cross-origin")
+  res.headers.set("Permissions-Policy", "geolocation=(), microphone=(), camera=()")
+  res.headers.set("Strict-Transport-Security", "max-age=63072000; includeSubDomains; preload")
+
+  const isPreview =
+    ctx.url.pathname === "/__preview" || ctx.url.pathname.startsWith("/__preview/")
+
+  if (isPreview) {
+    // Allow framing by the admin origin only.
+    res.headers.delete("X-Frame-Options")
+    res.headers.set(
+      "Content-Security-Policy",
+      // Note: 'unsafe-inline' kept narrow; preview hydration uses no
+      // dynamic eval. frame-ancestors permits ONLY admin origin.
+      `default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline'; img-src 'self' data: https:; font-src 'self' data:; connect-src 'self' ${ADMIN_ORIGIN}; frame-ancestors ${ADMIN_ORIGIN}`,
+    )
+    res.headers.set("Access-Control-Allow-Origin", ADMIN_ORIGIN)
+    res.headers.set("Vary", "Origin")
+  } else {
+    // Strict defaults for non-preview routes (unchanged).
+    res.headers.set("X-Frame-Options", "DENY")
+    res.headers.set(
+      "Content-Security-Policy",
+      "default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline'; img-src 'self' data: https:; font-src 'self' data:; frame-ancestors 'none'",
+    )
+  }
+
+  return res
+})
 ```
 
-Note: if the cloned site's `nginx.conf` had a different / stricter CSP, copy that value into the middleware before deleting the nginx config in Group 5. Read `nginx.conf` first via `Read`, port any custom header values into `src/middleware.ts`.
+Note: if the cloned site's `nginx.conf` had a different / stricter CSP, copy that value into the non-preview branch of the middleware before deleting the nginx config in Group 5. Read `nginx.conf` first via `Read`, port any custom header values into `src/middleware.ts`. The `/__preview` branch is editor-only and should retain the admin-origin framing relaxation regardless of upstream nginx CSP.
 
 Create `src/pages/healthz.ts`:
 
