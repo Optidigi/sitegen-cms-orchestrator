@@ -95,14 +95,80 @@ git commit -m "chore: install @astrojs/node + @astrojs/preact and switch to SSR 
 
 Create `src/lib/types.ts`:
 
-```typescript
-export type RichTextBlock = {
-  blockType: 'richText';
-  heading?: string;
-  body: string;  // pre-serialized HTML from Payload's afterChange
-};
+```ts
+// src/lib/types.ts — auto-scaffolded shape; mirrors siab-payload/src/blocks/*.ts.
 
-export type Block = RichTextBlock;
+export type HeroBlock = {
+  blockType: "hero"
+  eyebrow?: string | null
+  headline: string
+  subheadline?: string | null
+  cta?: { label?: string | null; href?: string | null } | null
+  image?: number | string | null  // Media id; resolved by Blocks.astro
+}
+
+export type FeatureListBlock = {
+  blockType: "featureList"
+  title?: string | null
+  intro?: string | null
+  features: Array<{
+    title: string
+    description?: string | null
+    icon?: string | null  // lucide-react icon name
+  }>
+}
+
+export type TestimonialsBlock = {
+  blockType: "testimonials"
+  title?: string | null
+  items: Array<{
+    quote: string
+    author: string
+    role?: string | null
+    avatar?: number | string | null  // Media id
+  }>
+}
+
+export type FAQBlock = {
+  blockType: "faq"
+  title?: string | null
+  items: Array<{ question: string; answer: string }>
+}
+
+export type CTABlock = {
+  blockType: "cta"
+  headline: string
+  description?: string | null
+  primary?: { label?: string | null; href?: string | null } | null
+  secondary?: { label?: string | null; href?: string | null } | null
+}
+
+export type RichTextBlock = {
+  blockType: "richText"
+  body: string
+}
+
+export type ContactSectionBlock = {
+  blockType: "contactSection"
+  title?: string | null
+  description?: string | null
+  formName: string
+  fields: Array<{
+    name: string
+    label: string
+    type: "text" | "email" | "tel" | "textarea"
+    required?: boolean
+  }>
+}
+
+export type Block =
+  | HeroBlock
+  | FeatureListBlock
+  | TestimonialsBlock
+  | FAQBlock
+  | CTABlock
+  | RichTextBlock
+  | ContactSectionBlock
 
 export type Page = {
   id: string;
@@ -297,54 +363,132 @@ export const GET: APIRoute = async ({ params }) => {
 };
 ```
 
-Create `src/components/cms/Blocks.astro`:
+Create `src/components/cms/Blocks.astro`. This file dispatches all 7 block types to their respective Preact (`.tsx`) renderers. Each renderer is wrapped in a `BlockErrorBoundary` so a single malformed block never takes down the whole page. The `hydrate` prop controls whether blocks ship JS to the client — production tenant pages call this with `hydrate=false` for pure SSR (0 KB JS), while the `/__preview` route passes `hydrate=true` so the editor can swap props live via React reconciliation.
 
 ```astro
 ---
-import RichText from './RichText.astro';
-import type { Block } from '../../lib/types';
+import Hero from "./Hero.tsx"
+import FeatureList from "./FeatureList.tsx"
+import Testimonials from "./Testimonials.tsx"
+import FAQ from "./FAQ.tsx"
+import CTA from "./CTA.tsx"
+import RichText from "./RichText.tsx"
+import ContactSection from "./ContactSection.tsx"
+import { BlockErrorBoundary } from "./BlockErrorBoundary.tsx"
+import type { Block } from "../../lib/types"
 
 interface Props {
-  blocks?: Block[] | null;
+  blocks?: Block[] | null
+  // resolveMedia takes a Media id and returns a URL string. Production
+  // resolves to tenant disk path (`/media/<id>/file.<ext>`); preview-mode
+  // resolves to CMS origin (`<PUBLIC_CMS_ORIGIN>/api/media/<id>/file`).
+  // Default = production resolver.
+  resolveMedia?: (id: number | string | null | undefined) => string | null
+  // hydrate=true wraps each block in `<Component client:load>` so the
+  // /__preview route can swap props via React reconciliation. Default
+  // false = pure SSR with 0 KB JS on tenant pages.
+  hydrate?: boolean
 }
 
-const { blocks } = Astro.props;
-const list = blocks ?? [];
+const { blocks, resolveMedia, hydrate = false } = Astro.props
+const list = blocks ?? []
+const resolve = resolveMedia ?? ((id) => (id == null ? null : `/media/${id}/file.jpg`))
 ---
 
-{list.map((block) => {
-  if (block.blockType === 'richText') {
-    return <RichText heading={block.heading} body={block.body} />;
-  }
-  // Unknown blockType — log so operators see when Payload introduces a
-  // type the SSR site hasn't been redeployed to handle. Render nothing
-  // (defensive) instead of throwing.
-  console.warn(`[cms/Blocks] unknown blockType: ${(block as any).blockType}`);
-  return null;
-})}
-```
-
-Create `src/components/cms/RichText.astro`:
-
-```astro
----
-interface Props {
-  heading?: string;
-  body?: string;
+{
+  list.map((block) => {
+    if (block.blockType === "hero") {
+      const props = {
+        eyebrow: block.eyebrow,
+        headline: block.headline,
+        subheadline: block.subheadline,
+        cta: block.cta,
+        imageUrl: resolve(block.image),
+        imageAlt: null,
+      }
+      return (
+        <BlockErrorBoundary blockType="hero" client:load={hydrate}>
+          <Hero {...props} client:load={hydrate} />
+        </BlockErrorBoundary>
+      )
+    }
+    if (block.blockType === "featureList") {
+      return (
+        <BlockErrorBoundary blockType="featureList" client:load={hydrate}>
+          <FeatureList
+            title={block.title}
+            intro={block.intro}
+            features={block.features}
+            client:load={hydrate}
+          />
+        </BlockErrorBoundary>
+      )
+    }
+    if (block.blockType === "testimonials") {
+      const items = (block.items ?? []).map((item) => ({
+        quote: item.quote,
+        author: item.author,
+        role: item.role,
+        avatarUrl: resolve(item.avatar),
+      }))
+      return (
+        <BlockErrorBoundary blockType="testimonials" client:load={hydrate}>
+          <Testimonials title={block.title} items={items} client:load={hydrate} />
+        </BlockErrorBoundary>
+      )
+    }
+    if (block.blockType === "faq") {
+      return (
+        <BlockErrorBoundary blockType="faq" client:load={hydrate}>
+          <FAQ title={block.title} items={block.items} client:load={hydrate} />
+        </BlockErrorBoundary>
+      )
+    }
+    if (block.blockType === "cta") {
+      return (
+        <BlockErrorBoundary blockType="cta" client:load={hydrate}>
+          <CTA
+            headline={block.headline}
+            description={block.description}
+            primary={block.primary}
+            secondary={block.secondary}
+            client:load={hydrate}
+          />
+        </BlockErrorBoundary>
+      )
+    }
+    if (block.blockType === "richText") {
+      return (
+        <BlockErrorBoundary blockType="richText" client:load={hydrate}>
+          <RichText body={block.body} client:load={hydrate} />
+        </BlockErrorBoundary>
+      )
+    }
+    if (block.blockType === "contactSection") {
+      return (
+        <BlockErrorBoundary blockType="contactSection" client:load={hydrate}>
+          <ContactSection
+            title={block.title}
+            description={block.description}
+            formName={block.formName}
+            fields={block.fields}
+            client:load={hydrate}
+          />
+        </BlockErrorBoundary>
+      )
+    }
+    console.warn(`[cms/Blocks] unknown blockType: ${(block as any).blockType}`)
+    return null
+  })
 }
-const { heading, body } = Astro.props;
----
-
-<section class="cms-block cms-block--richtext">
-  {heading ? <h2>{heading}</h2> : null}
-  {body ? <div set:html={body} /> : null}
-</section>
 ```
+
+The seven `.tsx` block renderers (`Hero.tsx`, `FeatureList.tsx`, `Testimonials.tsx`, `FAQ.tsx`, `CTA.tsx`, `RichText.tsx`, `ContactSection.tsx`) plus `BlockErrorBoundary.tsx` are scaffolded by later orchestrator phases — leave their authoring to those phases; this group only creates the dispatcher and the types.
 
 Verify all files compile in TS-aware projects via `pnpm astro check` if available; otherwise just `ls` to confirm presence:
 
 ```bash
-ls src/lib/cms.ts src/lib/types.ts src/middleware.ts src/pages/healthz.ts src/pages/media/[...path].ts src/components/cms/Blocks.astro src/components/cms/RichText.astro
+ls src/lib/cms.ts src/lib/types.ts src/middleware.ts src/pages/healthz.ts src/pages/media/[...path].ts src/components/cms/Blocks.astro
 ```
 
 Commit:
@@ -730,7 +874,6 @@ After all groups, return a markdown report:
 - src/pages/healthz.ts
 - src/pages/media/[...path].ts
 - src/components/cms/Blocks.astro
-- src/components/cms/RichText.astro
 - docker-compose.cms.yml.example
 
 ## Files modified
