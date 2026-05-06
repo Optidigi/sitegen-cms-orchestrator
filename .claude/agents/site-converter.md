@@ -39,7 +39,7 @@ Reference target shape (siab-site-template's defaults plus the SSR additions —
 Run from the cloned site repo root:
 
 ```bash
-pnpm add @astrojs/node @astrojs/preact preact
+pnpm add @astrojs/node @astrojs/preact preact lucide-preact
 ```
 
 Then update `astro.config.mjs`:
