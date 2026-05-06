@@ -18,48 +18,57 @@ Perform these groups in order. After each group, run the listed verification, th
 
 ---
 
-### Group 1 — Install adapter and switch to SSR output
+### Group 1 — Dependencies + Astro config (single carve-out window)
 
 **Read `astro.config.mjs` first.** The minimum required deltas are:
 
-1. Add `import node from '@astrojs/node';` (alongside the existing imports).
+1. Add `import node from '@astrojs/node';` and `import preact from '@astrojs/preact';` (alongside the existing imports).
 2. Set `output: 'server'` (replacing whatever's there, typically `'static'`).
 3. Set `adapter: node({ mode: 'standalone' })` (add the property to the `defineConfig` argument).
+4. Add `preact({ compat: false, include: ["**/components/cms/**", "**/components/preview/**"] })` to the `integrations` array.
 
-**Use `Edit` for these three changes**, preserving every other line of the file. The cloned site may have integrations, vite config, redirects, image config, or other properties beyond what `sitegen-template` ships — none of those should be touched.
+**Use `Edit` for these changes**, preserving every other line of the file. The cloned site may have integrations, vite config, redirects, image config, or other properties beyond what `sitegen-template` ships — none of those should be touched. In particular, Tailwind is already configured via the `sitegen-template` (`@tailwindcss/vite` import + `vite.plugins: [tailwindcss()]`) — preserve that import and the existing `vite.plugins` entry when patching; the example codeblock below shows the expected post-patch shape.
 
-Reference target shape (sitegen-template's defaults plus the SSR additions — yours may have more):
+Install ALL dependencies in Group 1. Never modify dependencies after Group 1
+(carve-out: `@astrojs/preact` and `preact` are sibling installs of
+`@astrojs/node`, added for the live-preview block-renderer story; this
+is a one-time exception, not a precedent for arbitrary deps).
 
-```javascript
-import { defineConfig } from 'astro/config';
-import sitemap from '@astrojs/sitemap';
-import tailwindcss from '@tailwindcss/vite';
-import node from '@astrojs/node';
+Run from the cloned site repo root:
 
-const SITE_URL = process.env.SITE_URL ?? 'https://example.com';
+```bash
+pnpm add @astrojs/node @astrojs/preact preact
+```
+
+Then update `astro.config.mjs`:
+
+```js
+import { defineConfig } from "astro/config"
+import sitemap from "@astrojs/sitemap"
+import node from "@astrojs/node"
+import preact from "@astrojs/preact"
+import tailwindcss from "@tailwindcss/vite"
 
 export default defineConfig({
-  site: SITE_URL,
-  output: 'server',
-  adapter: node({ mode: 'standalone' }),
-  integrations: [sitemap()],
+  site: "https://<primaryDomain>",
+  output: "server",
+  adapter: node({ mode: "standalone" }),
+  integrations: [
+    sitemap(),
+    preact({
+      compat: false,
+      include: ["**/components/cms/**", "**/components/preview/**"],
+    }),
+  ],
   vite: {
     plugins: [tailwindcss()],
   },
-  build: {
-    inlineStylesheets: 'auto',
-  },
-});
+})
 ```
 
 Only fall back to wholesale `Write` (with the template above) if the existing file has none of the expected `defineConfig` properties (genuinely empty or broken). If the existing file has integrations or vite config beyond what the template above shows, **preserve them** and bail with a diagnostic listing the unfamiliar entries — let the operator confirm they're CMS-safe before proceeding.
 
-Modify `package.json` — add `@astrojs/node` to dependencies and a `start` script:
-
-```bash
-cd <site-repo>
-pnpm add @astrojs/node
-```
+Modify `package.json` — verify the new deps landed and a `start` script exists:
 
 Then verify the `start` script in `package.json`:
 
@@ -81,7 +90,7 @@ Verify: `cat astro.config.mjs | grep -E "output:|adapter:" ` shows `output: 'ser
 Commit:
 ```bash
 git add astro.config.mjs package.json pnpm-lock.yaml
-git commit -m "chore: install @astrojs/node and switch to SSR output"
+git commit -m "chore: install @astrojs/node + @astrojs/preact and switch to SSR output"
 ```
 
 ---
@@ -90,14 +99,91 @@ git commit -m "chore: install @astrojs/node and switch to SSR output"
 
 Create `src/lib/types.ts`:
 
-```typescript
-export type RichTextBlock = {
-  blockType: 'richText';
-  heading?: string;
-  body: string;  // pre-serialized HTML from Payload's afterChange
-};
+```ts
+// src/lib/types.ts — auto-scaffolded shape; mirrors siab-payload/src/blocks/*.ts.
 
-export type Block = RichTextBlock;
+// Upload fields are projected to disk by Payload's `projectPageToDisk` hook
+// with depth>=1, so they arrive as full Media-like objects (not bare ids).
+// MediaRef accepts either shape so the renderer can degrade gracefully if
+// a tenant's data was projected without depth, but production sites should
+// always carry the populated object (with `.url`).
+export type MediaRef =
+  | number
+  | string
+  | { id: number | string; url?: string | null; filename?: string | null; alt?: string | null }
+  | null
+
+export type HeroBlock = {
+  blockType: "hero"
+  eyebrow?: string | null
+  headline: string
+  subheadline?: string | null
+  cta?: { label?: string | null; href?: string | null } | null
+  image?: MediaRef  // populated Media object (preferred) or bare id; resolved by Blocks.astro
+}
+
+export type FeatureListBlock = {
+  blockType: "featureList"
+  title?: string | null
+  intro?: string | null
+  features: Array<{
+    title: string
+    description?: string | null
+    icon?: string | null  // lucide-react icon name
+  }>
+}
+
+export type TestimonialsBlock = {
+  blockType: "testimonials"
+  title?: string | null
+  items: Array<{
+    quote: string
+    author: string
+    role?: string | null
+    avatar?: MediaRef  // populated Media object (preferred) or bare id
+  }>
+}
+
+export type FAQBlock = {
+  blockType: "faq"
+  title?: string | null
+  items: Array<{ question: string; answer: string }>
+}
+
+export type CTABlock = {
+  blockType: "cta"
+  headline: string
+  description?: string | null
+  primary?: { label?: string | null; href?: string | null } | null
+  secondary?: { label?: string | null; href?: string | null } | null
+}
+
+export type RichTextBlock = {
+  blockType: "richText"
+  body: string
+}
+
+export type ContactSectionBlock = {
+  blockType: "contactSection"
+  title?: string | null
+  description?: string | null
+  formName: string
+  fields: Array<{
+    name: string
+    label: string
+    type: "text" | "email" | "tel" | "textarea"
+    required?: boolean
+  }>
+}
+
+export type Block =
+  | HeroBlock
+  | FeatureListBlock
+  | TestimonialsBlock
+  | FAQBlock
+  | CTABlock
+  | RichTextBlock
+  | ContactSectionBlock
 
 export type Page = {
   id: string;
@@ -194,29 +280,51 @@ export function mediaPath(file: string): string {
 }
 ```
 
-Create `src/middleware.ts`:
+Create `src/middleware.ts`. The middleware sets strict security headers by default, but relaxes `X-Frame-Options` and `frame-ancestors` for the `/__preview` route family so the admin origin can iframe live previews. All other routes keep the strict defaults (DENY framing, `frame-ancestors 'none'`).
 
-```typescript
-import { defineMiddleware } from 'astro:middleware';
+```ts
+// src/middleware.ts
+import { defineMiddleware } from "astro:middleware"
 
-export const onRequest = defineMiddleware(async (_ctx, next) => {
-  const response = await next();
-  response.headers.set('X-Content-Type-Options', 'nosniff');
-  response.headers.set('X-Frame-Options', 'DENY');
-  response.headers.set('Referrer-Policy', 'strict-origin-when-cross-origin');
-  response.headers.set(
-    'Content-Security-Policy',
-    "default-src 'self'; img-src 'self' data: https:; style-src 'self' 'unsafe-inline'; font-src 'self' data:; script-src 'self'; object-src 'none'; base-uri 'self'; frame-ancestors 'none'",
-  );
-  response.headers.set(
-    'Permissions-Policy',
-    'camera=(), microphone=(), geolocation=(), interest-cohort=()',
-  );
-  return response;
-});
+const ADMIN_ORIGIN = process.env.PUBLIC_ADMIN_ORIGIN ?? "https://admin.siteinabox.nl"
+
+export const onRequest = defineMiddleware(async (ctx, next) => {
+  const res = await next()
+
+  // Common security headers (unchanged from prior version).
+  res.headers.set("X-Content-Type-Options", "nosniff")
+  res.headers.set("Referrer-Policy", "strict-origin-when-cross-origin")
+  res.headers.set("Permissions-Policy", "geolocation=(), microphone=(), camera=()")
+  res.headers.set("Strict-Transport-Security", "max-age=63072000; includeSubDomains; preload")
+
+  const isPreview =
+    ctx.url.pathname === "/__preview" || ctx.url.pathname.startsWith("/__preview/")
+
+  if (isPreview) {
+    // Allow framing by the admin origin only.
+    res.headers.delete("X-Frame-Options")
+    res.headers.set(
+      "Content-Security-Policy",
+      // Note: 'unsafe-inline' kept narrow; preview hydration uses no
+      // dynamic eval. frame-ancestors permits ONLY admin origin.
+      `default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline'; img-src 'self' data: https:; font-src 'self' data:; connect-src 'self' ${ADMIN_ORIGIN}; frame-ancestors ${ADMIN_ORIGIN}`,
+    )
+    res.headers.set("Access-Control-Allow-Origin", ADMIN_ORIGIN)
+    res.headers.set("Vary", "Origin")
+  } else {
+    // Strict defaults for non-preview routes (unchanged).
+    res.headers.set("X-Frame-Options", "DENY")
+    res.headers.set(
+      "Content-Security-Policy",
+      "default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline'; img-src 'self' data: https:; font-src 'self' data:; frame-ancestors 'none'",
+    )
+  }
+
+  return res
+})
 ```
 
-Note: if the cloned site's `nginx.conf` had a different / stricter CSP, copy that value into the middleware before deleting the nginx config in Group 5. Read `nginx.conf` first via `Read`, port any custom header values into `src/middleware.ts`.
+Note: if the cloned site's `nginx.conf` had a different / stricter CSP, copy that value into the non-preview branch of the middleware before deleting the nginx config in Group 5. Read `nginx.conf` first via `Read`, port any custom header values into `src/middleware.ts`. The `/__preview` branch is editor-only and should retain the admin-origin framing relaxation regardless of upstream nginx CSP.
 
 Create `src/pages/healthz.ts`:
 
@@ -270,54 +378,144 @@ export const GET: APIRoute = async ({ params }) => {
 };
 ```
 
-Create `src/components/cms/Blocks.astro`:
+Create `src/components/cms/Blocks.astro`. This file dispatches all 7 block types to their respective Preact (`.tsx`) renderers. Each renderer is wrapped in a `BlockErrorBoundary` so a single malformed block never takes down the whole page. The `hydrate` prop controls whether blocks ship JS to the client — production tenant pages call this with `hydrate=false` for pure SSR (0 KB JS), while the `/__preview` route passes `hydrate=true` so the editor can swap props live via React reconciliation.
 
 ```astro
 ---
-import RichText from './RichText.astro';
-import type { Block } from '../../lib/types';
+import Hero from "./Hero.tsx"
+import FeatureList from "./FeatureList.tsx"
+import Testimonials from "./Testimonials.tsx"
+import FAQ from "./FAQ.tsx"
+import CTA from "./CTA.tsx"
+import RichText from "./RichText.tsx"
+import ContactSection from "./ContactSection.tsx"
+import { BlockErrorBoundary } from "./BlockErrorBoundary.tsx"
+import type { Block, MediaRef } from "../../lib/types"
 
 interface Props {
-  blocks?: Block[] | null;
+  blocks?: Block[] | null
+  // resolveMedia takes a populated MediaRef (or bare id) and returns a URL
+  // string. Production: when projectPageToDisk runs at depth>=1, upload
+  // fields are populated Media objects — the default resolver just reads
+  // the `.url` field. Preview-mode can override to rewrite URLs to the
+  // CMS origin. Default = production resolver.
+  resolveMedia?: (ref: MediaRef) => string | null
+  // hydrate=true wraps each block in `<Component client:load>` so the
+  // /__preview route can swap props via React reconciliation. Default
+  // false = pure SSR with 0 KB JS on tenant pages.
+  hydrate?: boolean
 }
 
-const { blocks } = Astro.props;
-const list = blocks ?? [];
+const { blocks, resolveMedia, hydrate = false } = Astro.props
+const list = blocks ?? []
+// Default resolver: prefer the populated `.url` from a Media-like object.
+// If only a bare id is present, return null — we have no extension info,
+// so guessing (e.g. `.jpg`) would 404 for png/webp/svg uploads. Production
+// projection always populates the object, so the null branch only fires
+// for malformed data; renderers gracefully omit the image in that case.
+const resolve =
+  resolveMedia ??
+  ((ref: MediaRef) => {
+    if (ref == null) return null
+    if (typeof ref === "object" && "url" in ref && ref.url) return ref.url
+    return null
+  })
 ---
 
-{list.map((block) => {
-  if (block.blockType === 'richText') {
-    return <RichText heading={block.heading} body={block.body} />;
-  }
-  // Unknown blockType — log so operators see when Payload introduces a
-  // type the SSR site hasn't been redeployed to handle. Render nothing
-  // (defensive) instead of throwing.
-  console.warn(`[cms/Blocks] unknown blockType: ${(block as any).blockType}`);
-  return null;
-})}
-```
-
-Create `src/components/cms/RichText.astro`:
-
-```astro
----
-interface Props {
-  heading?: string;
-  body?: string;
+{
+  list.map((block) => {
+    if (block.blockType === "hero") {
+      const props = {
+        eyebrow: block.eyebrow,
+        headline: block.headline,
+        subheadline: block.subheadline,
+        cta: block.cta,
+        imageUrl: resolve(block.image),
+        imageAlt: null,
+      }
+      return (
+        <BlockErrorBoundary blockType="hero" client:load={hydrate}>
+          <Hero {...props} client:load={hydrate} />
+        </BlockErrorBoundary>
+      )
+    }
+    if (block.blockType === "featureList") {
+      return (
+        <BlockErrorBoundary blockType="featureList" client:load={hydrate}>
+          <FeatureList
+            title={block.title}
+            intro={block.intro}
+            features={block.features}
+            client:load={hydrate}
+          />
+        </BlockErrorBoundary>
+      )
+    }
+    if (block.blockType === "testimonials") {
+      const items = (block.items ?? []).map((item) => ({
+        quote: item.quote,
+        author: item.author,
+        role: item.role,
+        avatarUrl: resolve(item.avatar),
+      }))
+      return (
+        <BlockErrorBoundary blockType="testimonials" client:load={hydrate}>
+          <Testimonials title={block.title} items={items} client:load={hydrate} />
+        </BlockErrorBoundary>
+      )
+    }
+    if (block.blockType === "faq") {
+      return (
+        <BlockErrorBoundary blockType="faq" client:load={hydrate}>
+          <FAQ title={block.title} items={block.items} client:load={hydrate} />
+        </BlockErrorBoundary>
+      )
+    }
+    if (block.blockType === "cta") {
+      return (
+        <BlockErrorBoundary blockType="cta" client:load={hydrate}>
+          <CTA
+            headline={block.headline}
+            description={block.description}
+            primary={block.primary}
+            secondary={block.secondary}
+            client:load={hydrate}
+          />
+        </BlockErrorBoundary>
+      )
+    }
+    if (block.blockType === "richText") {
+      return (
+        <BlockErrorBoundary blockType="richText" client:load={hydrate}>
+          <RichText body={block.body} client:load={hydrate} />
+        </BlockErrorBoundary>
+      )
+    }
+    if (block.blockType === "contactSection") {
+      return (
+        <BlockErrorBoundary blockType="contactSection" client:load={hydrate}>
+          <ContactSection
+            title={block.title}
+            description={block.description}
+            formName={block.formName}
+            fields={block.fields}
+            client:load={hydrate}
+          />
+        </BlockErrorBoundary>
+      )
+    }
+    console.warn(`[cms/Blocks] unknown blockType: ${(block as any).blockType}`)
+    return null
+  })
 }
-const { heading, body } = Astro.props;
----
-
-<section class="cms-block cms-block--richtext">
-  {heading ? <h2>{heading}</h2> : null}
-  {body ? <div set:html={body} /> : null}
-</section>
 ```
+
+The seven `.tsx` block renderers (`Hero.tsx`, `FeatureList.tsx`, `Testimonials.tsx`, `FAQ.tsx`, `CTA.tsx`, `RichText.tsx`, `ContactSection.tsx`) plus `BlockErrorBoundary.tsx` are scaffolded by later orchestrator phases — leave their authoring to those phases; this group only creates the dispatcher and the types.
 
 Verify all files compile in TS-aware projects via `pnpm astro check` if available; otherwise just `ls` to confirm presence:
 
 ```bash
-ls src/lib/cms.ts src/lib/types.ts src/middleware.ts src/pages/healthz.ts src/pages/media/[...path].ts src/components/cms/Blocks.astro src/components/cms/RichText.astro
+ls src/lib/cms.ts src/lib/types.ts src/middleware.ts src/pages/healthz.ts src/pages/media/[...path].ts src/components/cms/Blocks.astro
 ```
 
 Commit:
@@ -688,7 +886,7 @@ After all groups, return a markdown report:
 # Conversion report — site-<slug>
 
 ## Commits
-- <sha> chore: install @astrojs/node and switch to SSR output
+- <sha> chore: install @astrojs/node + @astrojs/preact and switch to SSR output
 - <sha> feat: add cms reader, types, middleware, healthz, media route, blocks renderer
 - <sha> refactor: rewrite page routes to use CMS reader
 - <sha> refactor: source SEO components from CMS instead of site.ts
@@ -703,7 +901,6 @@ After all groups, return a markdown report:
 - src/pages/healthz.ts
 - src/pages/media/[...path].ts
 - src/components/cms/Blocks.astro
-- src/components/cms/RichText.astro
 - docker-compose.cms.yml.example
 
 ## Files modified
@@ -741,6 +938,6 @@ If you bailed before completing all 7 groups, list ONLY the commits actually mad
 - If any expected file is missing (e.g., `src/content/site.ts`), bail and report — do not invent a substitute.
 - Use `Edit` for surgical modifications to existing files; only use `Write` for new files or when wholesale replacement is unavoidable. Read files before editing them.
 - **Every reference to a `getSite()` / `getPage()` result uses `?.` or a guarded conditional.** No bare `site.X` or `page.X` access anywhere — the cms-reviewer (Phase 7) greps for these patterns and will fail the conversion otherwise.
-- **Never modify dependencies after Group 1.** The only `pnpm add` is for `@astrojs/node`. If you encounter type errors that seem to need a missing `@types/*` package, bail and report — don't install.
+- **Never modify dependencies after Group 1.** Group 1's only `pnpm add` covers `@astrojs/node @astrojs/preact preact` together (carve-out: `@astrojs/preact` and `preact` are sibling installs of `@astrojs/node`, added for the live-preview block-renderer story; this is a one-time exception, not a precedent for arbitrary deps). If you encounter type errors that seem to need a missing `@types/*` package, bail and report — don't install.
 - One logical group = one commit. Do NOT bundle multiple groups into one commit.
 - After each commit, do a quick `git status` to confirm the working tree is clean before moving to the next group.
