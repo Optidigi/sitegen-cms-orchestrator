@@ -27,7 +27,7 @@ Perform these groups in order. After each group, run the listed verification, th
 3. Set `adapter: node({ mode: 'standalone' })` (add the property to the `defineConfig` argument).
 4. Add `preact({ compat: false, include: ["**/components/cms/**", "**/components/preview/**"] })` to the `integrations` array.
 
-**Use `Edit` for these changes**, preserving every other line of the file. The cloned site may have integrations, vite config, redirects, image config, or other properties beyond what `sitegen-template` ships — none of those should be touched.
+**Use `Edit` for these changes**, preserving every other line of the file. The cloned site may have integrations, vite config, redirects, image config, or other properties beyond what `sitegen-template` ships — none of those should be touched. In particular, Tailwind is already configured via the `sitegen-template` (`@tailwindcss/vite` import + `vite.plugins: [tailwindcss()]`) — preserve that import and the existing `vite.plugins` entry when patching; the example codeblock below shows the expected post-patch shape.
 
 Install ALL dependencies in Group 1. Never modify dependencies after Group 1
 (carve-out: `@astrojs/preact` and `preact` are sibling installs of
@@ -47,6 +47,7 @@ import { defineConfig } from "astro/config"
 import sitemap from "@astrojs/sitemap"
 import node from "@astrojs/node"
 import preact from "@astrojs/preact"
+import tailwindcss from "@tailwindcss/vite"
 
 export default defineConfig({
   site: "https://<primaryDomain>",
@@ -59,6 +60,9 @@ export default defineConfig({
       include: ["**/components/cms/**", "**/components/preview/**"],
     }),
   ],
+  vite: {
+    plugins: [tailwindcss()],
+  },
 })
 ```
 
