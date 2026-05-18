@@ -93,25 +93,48 @@ For each markdown page:
    ```json
    {
      "blockType": "richText",
-     "heading": "<H2 text without the leading '## '>",
-     "body": "<HTML of section excluding the H2 line>"
+     "body": <RtRoot JSON — see below>,
+     "anchor": "<slug of the H2 text>"
    }
    ```
 
-   The live `RichText.body` field on `siab-payload`'s `pages` collection is a plain `textarea` rendered via `set:html` on the SSR side, so the body must be **HTML, not markdown**. Lexical is configured for the global `lexicalEditor` but is NOT used by the `richText` block — ship plain HTML.
+   The live `RichText.body` field on `siab-payload`'s `pages` collection is `type: "json"` validated against `rtRootSchema` (block variant) by the `validateRichTextOnSave` collection hook. A POST with a string value hard-fails with `Rich text validation failed: …`. The block has no `heading` field today — the H2 text becomes the in-page anchor instead via the optional `anchor` field.
 
-   Convert the per-section markdown to HTML before packing it into the block. The orchestrator standardizes on **`marked`** (resolved on demand via `npx`) — no system install required (covered by the `node`/`pnpm` prereq) and produces the bare HTML fragment Payload needs:
+   Convert the per-section markdown to RtRoot via the orchestrator's `scripts/md-to-rtroot.mjs` helper. Install once per orchestrator clone:
+
+   ```bash
+   # Lazy install on first run (idempotent; no-op after first run)
+   (cd "${ORCH_ROOT}/scripts" && npm install --silent)
+   ```
+
+   Then per section:
 
    ```bash
    # After extracting the per-section markdown into $MD_BODY:
-   HTML_BODY=$(printf '%s' "$MD_BODY" | npx --yes marked)
+   BODY_JSON=$(printf '%s' "$MD_BODY" | node "${ORCH_ROOT}/scripts/md-to-rtroot.mjs")
    ```
 
-   The `body` value POSTed to Payload must be an HTML string (no `<html>` / `<body>` wrappers — `marked` already produces a fragment by default). If `marked` ever fails (e.g. offline operator without the package cached), the seeder should surface the error and stop — do NOT POST raw markdown.
+   `BODY_JSON` is a JSON string ready to use with `--argjson` in the page POST. If the helper fails or emits invalid JSON, surface the error and stop — do NOT POST a fallback shape.
+
+   Compute the anchor from the H2 text:
+
+   ```bash
+   ANCHOR=$(printf '%s' "$H2_TEXT" | tr '[:upper:]' '[:lower:]' | tr -c 'a-z0-9-' '-' | sed 's/-\+/-/g; s/^-//; s/-$//')
+   ```
+
+   Pack each section as:
+
+   ```bash
+   BLOCK=$(jq -n \
+     --argjson body "$BODY_JSON" \
+     --arg anchor "$ANCHOR" \
+     '{blockType: "richText", body: $body}
+      + (if $anchor | length > 0 then {anchor: $anchor} else {} end)')
+   ```
 
    Edge cases:
-   - **Content before the first H2** (intro paragraphs after the H1): wrap in a leading block with `heading: ""` and the body as the HTML of that pre-H2 section.
-   - **No H2s at all** (page is just an H1 + body): produce a single block with `heading: ""` and the entire post-H1 body as HTML.
+   - **Content before the first H2** (intro paragraphs after the H1): one block, `anchor` omitted (no H2 text to slugify).
+   - **No H2s at all** (page is just an H1 + body): one block with the whole post-H1 body, `anchor` omitted.
 
 5. POST the page using the `jq -n` pattern (NOT a `-d '{ ... }'` literal):
 
