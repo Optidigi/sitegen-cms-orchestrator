@@ -301,9 +301,11 @@ This is non-fatal — if both files are missing, surface the warning and continu
 
 ## Body format note
 
-The `siab-payload` `pages` collection's `richText` block has a plain `textarea` for `body` and the SSR site renders it via `set:html`. **Ship plain HTML** (see step 4 above for the markdown->HTML conversion). Lexical is configured for the global `lexicalEditor` but is not used by the `richText` block.
+The `siab-payload` `pages` collection's `richText.body` field is `type: "json"`, validated against `rtRootSchema` (block variant) by the `validateRichTextOnSave` collection hook. The schema enforces the rt-dom-contract documented at `siab-payload/docs/runbooks/rt-dom-contract.md`. Ship `RtRoot` JSON — never HTML, never markdown text. A POST with a string body hard-fails with `Rich text validation failed: …`.
 
-If the live collection schema later changes (e.g., `body` becomes Lexical JSON or a different shape) and a POST 4xx-es with a schema mismatch error, do NOT retry blindly. Stop and report — the orchestrator will escalate the schema contract.
+The seeder produces RtRoot via `node scripts/md-to-rtroot.mjs` (see step 4). The helper walks the markdown AST via `marked.lexer()` and maps tokens to RtNode types per the contract. Unsupported tokens (tables, inline images, embedded HTML) are skipped with stderr warnings.
+
+If the live collection schema later changes (e.g., `body` becomes a different shape) and a POST 4xx-es with a schema mismatch error, do NOT retry blindly. Stop and report — the orchestrator will escalate the schema contract.
 
 ## Output contract
 
