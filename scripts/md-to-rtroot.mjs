@@ -104,10 +104,12 @@ function inlineTokensToRtInline(tokens) {
         out.push(...wrapMark(t.tokens ?? [{ type: "text", text: t.text }], "strikethrough"))
         break
       case "link":
+        // Treat any absolute URI with a scheme (http(s), mailto, tel, ftp, etc.)
+        // as external; only relative refs (/, #, ?, or no-scheme) are internal.
         out.push({
           t: "link",
           href: t.href,
-          rel: t.href.startsWith("http://") || t.href.startsWith("https://") ? "external" : "internal",
+          rel: /^[a-z][a-z0-9+.-]*:/i.test(t.href ?? "") ? "external" : "internal",
           children: inlineTokensToRtInline(t.tokens ?? [{ type: "text", text: t.text }]),
         })
         break

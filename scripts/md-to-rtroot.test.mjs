@@ -117,3 +117,22 @@ test("h1 stripped from output (page title owns h1)", () => {
   const out = run("# Page Title\n\nbody text")
   assert.ok(!out.children.some(n => n.t === "heading" && n.level === 1))
 })
+
+test("mailto: link → external rel", () => {
+  const out = run("[email](mailto:hello@example.com)")
+  const link = out.children[0].children.find(n => n.t === "link")
+  assert.equal(link.rel, "external")
+  assert.equal(link.href, "mailto:hello@example.com")
+})
+
+test("tel: link → external rel", () => {
+  const out = run("[call](tel:+31123456)")
+  const link = out.children[0].children.find(n => n.t === "link")
+  assert.equal(link.rel, "external")
+})
+
+test("anchor-only link → internal rel", () => {
+  const out = run("[top](#section)")
+  const link = out.children[0].children.find(n => n.t === "link")
+  assert.equal(link.rel, "internal")
+})
