@@ -496,12 +496,14 @@ const resolve =
   list.map((block) => {
     if (block.blockType === "hero") {
       const props = {
+        anchor: block.anchor,
         eyebrow: block.eyebrow,
         headline: block.headline,
         subheadline: block.subheadline,
+        pills: block.pills,
         cta: block.cta,
         imageUrl: resolve(block.image),
-        imageAlt: null,
+        imageAlt: block.imageAlt,
       }
       return (
         <BlockErrorBoundary blockType="hero" client:load={hydrate}>
@@ -513,6 +515,7 @@ const resolve =
       return (
         <BlockErrorBoundary blockType="featureList" client:load={hydrate}>
           <FeatureList
+            anchor={block.anchor}
             title={block.title}
             intro={block.intro}
             features={block.features}
@@ -530,14 +533,24 @@ const resolve =
       }))
       return (
         <BlockErrorBoundary blockType="testimonials" client:load={hydrate}>
-          <Testimonials title={block.title} items={items} client:load={hydrate} />
+          <Testimonials
+            anchor={block.anchor}
+            title={block.title}
+            items={items}
+            client:load={hydrate}
+          />
         </BlockErrorBoundary>
       )
     }
     if (block.blockType === "faq") {
       return (
         <BlockErrorBoundary blockType="faq" client:load={hydrate}>
-          <FAQ title={block.title} items={block.items} client:load={hydrate} />
+          <FAQ
+            anchor={block.anchor}
+            title={block.title}
+            items={block.items}
+            client:load={hydrate}
+          />
         </BlockErrorBoundary>
       )
     }
@@ -545,6 +558,8 @@ const resolve =
       return (
         <BlockErrorBoundary blockType="cta" client:load={hydrate}>
           <CTA
+            anchor={block.anchor}
+            eyebrow={block.eyebrow}
             headline={block.headline}
             description={block.description}
             primary={block.primary}
@@ -557,7 +572,11 @@ const resolve =
     if (block.blockType === "richText") {
       return (
         <BlockErrorBoundary blockType="richText" client:load={hydrate}>
-          <RichText body={block.body} client:load={hydrate} />
+          <RichText
+            anchor={block.anchor}
+            body={block.body}
+            client:load={hydrate}
+          />
         </BlockErrorBoundary>
       )
     }
@@ -565,6 +584,7 @@ const resolve =
       return (
         <BlockErrorBoundary blockType="contactSection" client:load={hydrate}>
           <ContactSection
+            anchor={block.anchor}
             title={block.title}
             description={block.description}
             formName={block.formName}
