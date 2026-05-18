@@ -995,10 +995,16 @@ COPY --from=build /app/package.json /app/pnpm-lock.yaml ./
 RUN corepack enable && pnpm install --prod --frozen-lockfile
 COPY --from=build /app/dist ./dist
 
+# OBS-55 entrypoint workaround — copy dist/cms/* into /data on start.
+# Becomes inert when proper orchestrator deploy hook lands per OBS-55.
+COPY scripts/docker-entrypoint.sh /usr/local/bin/docker-entrypoint.sh
+RUN chmod +x /usr/local/bin/docker-entrypoint.sh
+
 EXPOSE 4321
 
 HEALTHCHECK --interval=30s --timeout=3s CMD wget -qO- http://127.0.0.1:4321/healthz >/dev/null || exit 1
 
+ENTRYPOINT ["/usr/local/bin/docker-entrypoint.sh"]
 CMD ["node", "./dist/server/entry.mjs"]
 ```
 
