@@ -327,6 +327,9 @@ Return a markdown report:
 ## Site settings
 - siteSettings created (id <sid>) with brand, language, primaryDomain, NAP, socials.
 
+## Site manifest
+- ${MANIFEST_STATUS}    # e.g. "set from siteManifest.json" or "WARN: not found, using DEFAULT_MANIFEST"
+
 ## Failures
 <If no failures, write a single line: "- (none)">
 <If failures exist, list one per line with file/page/image and cause>
