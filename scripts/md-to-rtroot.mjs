@@ -103,16 +103,29 @@ function inlineTokensToRtInline(tokens) {
       case "del":
         out.push(...wrapMark(t.tokens ?? [{ type: "text", text: t.text }], "strikethrough"))
         break
-      case "link":
+      case "link": {
+        // Normalize href to satisfy siab-payload's hrefSchema:
+        // - must startsWith("/") OR have a valid URL protocol (http/https/mailto/tel)
+        // - empty / null hrefs: flatten to plain text (drop link wrapper)
+        // - anchor-only hrefs (#foo): normalize to /#foo
+        const rawHref = t.href ?? ""
+        const innerInline = inlineTokensToRtInline(t.tokens ?? [{ type: "text", text: t.text }])
+        if (rawHref === "") {
+          // Flatten — emit inner text without the link wrapper
+          out.push(...innerInline)
+          break
+        }
+        const href = rawHref.startsWith("#") ? `/${rawHref}` : rawHref
         // Treat any absolute URI with a scheme (http(s), mailto, tel, ftp, etc.)
         // as external; only relative refs (/, #, ?, or no-scheme) are internal.
         out.push({
           t: "link",
-          href: t.href,
-          rel: /^[a-z][a-z0-9+.-]*:/i.test(t.href ?? "") ? "external" : "internal",
-          children: inlineTokensToRtInline(t.tokens ?? [{ type: "text", text: t.text }]),
+          href,
+          rel: /^[a-z][a-z0-9+.-]*:/i.test(href) ? "external" : "internal",
+          children: innerInline,
         })
         break
+      }
       case "br":
         out.push({ t: "linebreak" })
         break

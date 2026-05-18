@@ -131,8 +131,17 @@ test("tel: link → external rel", () => {
   assert.equal(link.rel, "external")
 })
 
-test("anchor-only link → internal rel", () => {
+test("anchor-only link normalized to /#anchor (satisfies hrefSchema /-prefix rule)", () => {
   const out = run("[top](#section)")
   const link = out.children[0].children.find(n => n.t === "link")
+  assert.equal(link.href, "/#section")
   assert.equal(link.rel, "internal")
+})
+
+test("empty href flattens to plain text (no link wrapper)", () => {
+  const out = run("[broken]()")
+  const inline = out.children[0].children
+  // Should be a text node, not a link node
+  assert.ok(!inline.some(n => n.t === "link"), "no link node should remain")
+  assert.ok(inline.some(n => n.t === "text" && n.v === "broken"), "inner text preserved")
 })
