@@ -1048,7 +1048,7 @@ services:
     ports:
       - "4321:4321"
     volumes:
-      - <vps-data-path>:/data:ro
+      - <vps-data-path>:/data:rw   # OBS-55 workaround: was :ro; entrypoint needs write. Revert to :ro when proper orchestrator-level docker cp deploy hook lands per OBS-55.
     environment:
       CMS_DATA_DIR: /data
       SITE_URL: https://<primaryDomain>
@@ -1081,7 +1081,7 @@ This site reads editorial content from a per-tenant Payload CMS data directory m
 
 **Required volume:**
 
-- Mount the per-tenant data dir at `/data:ro`. See `docker-compose.cms.yml.example`.
+- Mount the per-tenant data dir at `/data:rw` (OBS-55 workaround — see `docker-compose.cms.yml.example`). Reverts to `:ro` when the proper orchestrator-level deploy hook lands.
 
 **Editor:**
 
