@@ -102,73 +102,137 @@ git commit -m "chore: install @astrojs/node + @astrojs/preact and switch to SSR 
 Create `src/lib/types.ts`:
 
 ```ts
-// src/lib/types.ts — auto-scaffolded shape; mirrors siab-payload/src/blocks/*.ts.
+// src/lib/types.ts — auto-scaffolded shape; mirrors siab-payload/src/blocks/*.ts
+// (post-Phase-D + OBS-57) + siab-site-template/src/lib/types.ts (post-OBS-56).
 
-// Upload fields are projected to disk by Payload's `projectPageToDisk` hook
-// with depth>=1, so they arrive as full Media-like objects (not bare ids).
-// MediaRef accepts either shape so the renderer can degrade gracefully if
-// a tenant's data was projected without depth, but production sites should
-// always carry the populated object (with `.url`).
+// ---------------------------------------------------------------------------
+// Rich Text node types (mirrored from siab-payload/src/lib/richText/RtNode.ts)
+// ---------------------------------------------------------------------------
+export type RtMark = "bold" | "italic" | "underline" | "code" | "strikethrough"
+
+export interface RtText {
+  t: "text"
+  v: string
+  marks?: RtMark[]
+  style?: string
+  color?: string
+}
+
+export interface RtLink {
+  t: "link"
+  href: string
+  rel?: "external" | "internal"
+  children: RtInline[]
+}
+
+export interface RtLineBreak { t: "linebreak" }
+
+export type RtInline = RtText | RtLink | RtLineBreak
+
+export type RtAlign = "left" | "center" | "right" | "justify"
+
+export interface RtParagraph  { t: "paragraph"; align?: RtAlign; children: RtInline[] }
+export interface RtHeading    { t: "heading"; level: 2 | 3 | 4; align?: RtAlign; style?: string; children: RtInline[] }
+export interface RtList       { t: "list"; ordered: boolean; items: RtListItem[] }
+export interface RtListItem   { t: "listItem"; children: RtBlock[] }
+export interface RtBlockquote { t: "blockquote"; children: RtBlock[] }
+export interface RtDivider    { t: "divider" }
+
+export interface RtThemed {
+  t: "themed"
+  id: string
+  props: Record<string, unknown>
+  children?: RtBlock[]
+}
+
+export type RtBlock =
+  | RtParagraph
+  | RtHeading
+  | RtList
+  | RtBlockquote
+  | RtDivider
+  | RtThemed
+
+export interface RtBlockRoot  { t: "root"; variant: "block";  children: RtBlock[] }
+export interface RtInlineRoot { t: "root"; variant: "inline"; children: RtInline[] }
+export type RtRoot = RtBlockRoot | RtInlineRoot
+
+// ---------------------------------------------------------------------------
+// Media reference (resolved by Blocks.astro via mediaPath/resolveMedia helper)
+// ---------------------------------------------------------------------------
 export type MediaRef =
   | number
   | string
   | { id: number | string; url?: string | null; filename?: string | null; alt?: string | null }
   | null
 
+// ---------------------------------------------------------------------------
+// Block types — mirror siab-payload/src/blocks/*.ts schemas
+// ---------------------------------------------------------------------------
 export type HeroBlock = {
   blockType: "hero"
-  eyebrow?: string | null
-  headline: string
-  subheadline?: string | null
+  anchor?: string | null
+  eyebrow?: RtRoot | null
+  headline: RtRoot
+  subheadline?: RtRoot | null
+  pills?: Array<{ label: string; id?: string | null }>
   cta?: { label?: string | null; href?: string | null } | null
-  image?: MediaRef  // populated Media object (preferred) or bare id; resolved by Blocks.astro
+  image?: MediaRef
+  imageAlt?: string | null
 }
 
 export type FeatureListBlock = {
   blockType: "featureList"
-  title?: string | null
-  intro?: string | null
+  anchor?: string | null
+  title?: RtRoot | null
+  intro?: RtRoot | null
   features: Array<{
-    title: string
-    description?: string | null
-    icon?: string | null  // lucide-react icon name
+    title: RtRoot
+    description?: RtRoot | null
+    icon?: string | null
   }>
 }
 
 export type TestimonialsBlock = {
   blockType: "testimonials"
+  anchor?: string | null
   title?: string | null
   items: Array<{
     quote: string
     author: string
     role?: string | null
-    avatar?: MediaRef  // populated Media object (preferred) or bare id
+    avatar?: MediaRef
   }>
 }
 
 export type FAQBlock = {
   blockType: "faq"
-  title?: string | null
-  items: Array<{ question: string; answer: string }>
+  anchor?: string | null
+  title?: RtRoot | null
+  items: Array<{ question: RtRoot; answer: RtRoot }>
 }
 
 export type CTABlock = {
   blockType: "cta"
-  headline: string
-  description?: string | null
-  primary?: { label?: string | null; href?: string | null } | null
+  anchor?: string | null
+  eyebrow?: RtRoot | null
+  headline: RtRoot
+  description?: RtRoot | null
+  primary: { label: string; href: string }
   secondary?: { label?: string | null; href?: string | null } | null
 }
 
 export type RichTextBlock = {
   blockType: "richText"
-  body: string
+  anchor?: string | null
+  body: RtRoot
 }
 
 export type ContactSectionBlock = {
   blockType: "contactSection"
-  title?: string | null
-  description?: string | null
+  anchor?: string | null
+  title?: RtRoot | null
+  description?: RtRoot | null
   formName: string
   fields: Array<{
     name: string
@@ -187,55 +251,59 @@ export type Block =
   | RichTextBlock
   | ContactSectionBlock
 
+// ---------------------------------------------------------------------------
+// Page + SiteSettings types
+// ---------------------------------------------------------------------------
 export type Page = {
-  id: string;
-  slug: string;
-  title: string;
-  description: string;
-  keywords: string[];
-  ogImage?: string;
-  role: 'home' | 'about' | 'services' | 'contact' | 'page';
-  order: number;
-  blocks: Block[];
-  updatedAt: string;
-};
+  id: string
+  slug: string
+  title: string
+  status: "draft" | "published"
+  blocks: Block[]
+  seo?: {
+    title?: string | null
+    description?: string | null
+    ogImage?: MediaRef | string | null
+  }
+  updatedAt: string
+}
 
 export type NAP = {
-  legalName: string;
-  displayName: string;
-  street: string;
-  postalCode: string;
-  city: string;
-  country: string;
-  phone: string;
-  email: string;
-};
+  legalName: string
+  displayName: string
+  street: string
+  postalCode: string
+  city: string
+  country: string
+  phone: string
+  email: string
+}
 
 export type OpeningHours = {
-  dayOfWeek: 'Mo' | 'Tu' | 'We' | 'Th' | 'Fr' | 'Sa' | 'Su';
-  opens: string;
-  closes: string;
-};
+  dayOfWeek: 'Mo' | 'Tu' | 'We' | 'Th' | 'Fr' | 'Sa' | 'Su'
+  opens: string
+  closes: string
+}
 
 export type SiteSettings = {
-  brand: string;
-  language: string;
-  primaryDomain: string;
-  aliases: string[];
-  description: string;
-  nap?: NAP;
-  hours?: OpeningHours[];
-  serviceArea?: string[];
+  brand: string
+  language: string
+  primaryDomain: string
+  aliases: string[]
+  description?: string
+  nap?: NAP
+  hours?: OpeningHours[]
+  serviceArea?: string[]
   socials: {
-    facebook?: string;
-    instagram?: string;
-    linkedin?: string;
-    youtube?: string;
-    x?: string;
-  };
-  nav: { label: string; href: string }[];
-  updatedAt: string;
-};
+    facebook?: string
+    instagram?: string
+    linkedin?: string
+    youtube?: string
+    x?: string
+  }
+  nav: { label: string; href: string }[]
+  updatedAt: string
+}
 ```
 
 Create `src/lib/cms.ts`:
