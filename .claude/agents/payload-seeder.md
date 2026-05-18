@@ -269,6 +269,36 @@ curl -fsS -X POST "${PAYLOAD_API_URL}/api/site-settings" \
 
 Do NOT send `id` or `updatedAt` — both are server-assigned.
 
+## Seed Tenant.siteManifest
+
+After siteSettings POST succeeds, seed the tenant's `siteManifest` field. `siab-site-orchestrator` Phase 2 generates `siteManifest.json` at the site repo root by copying `siteManifest.example.json` from the template; this seeder reads it and PATCHes it onto the tenant.
+
+```bash
+MANIFEST_PATH="${SITE_REPO}/siteManifest.json"
+if [ ! -f "$MANIFEST_PATH" ]; then
+  MANIFEST_PATH="${SITE_REPO}/siteManifest.example.json"
+fi
+
+if [ -f "$MANIFEST_PATH" ]; then
+  MANIFEST_JSON=$(cat "$MANIFEST_PATH")
+  BODY=$(jq -n --argjson manifest "$MANIFEST_JSON" '{siteManifest: $manifest}')
+  curl -fsS -X PATCH "${PAYLOAD_API_URL}/api/tenants/${TENANT_ID}" \
+    -H "Authorization: users API-Key ${PAYLOAD_API_TOKEN}" \
+    -H "Content-Type: application/json" \
+    -d "$BODY"
+  echo "siteManifest set on tenant ${TENANT_ID} from ${MANIFEST_PATH}"
+  MANIFEST_STATUS="set from $(basename "$MANIFEST_PATH")"
+else
+  echo "WARN: no siteManifest.json or siteManifest.example.json at site repo root."
+  echo "      Tenant will use siab-payload's DEFAULT_MANIFEST."
+  echo "      Caveat: DEFAULT_MANIFEST only allows paragraph + h2/h3 + bold/italic;"
+  echo "      seeded pages with lists / quotes / dividers will fail validation."
+  MANIFEST_STATUS="WARN: not found, using DEFAULT_MANIFEST"
+fi
+```
+
+This is non-fatal — if both files are missing, surface the warning and continue. The `MANIFEST_STATUS` variable is used in the output contract's `## Site manifest` section.
+
 ## Body format note
 
 The `siab-payload` `pages` collection's `richText` block has a plain `textarea` for `body` and the SSR site renders it via `set:html`. **Ship plain HTML** (see step 4 above for the markdown->HTML conversion). Lexical is configured for the global `lexicalEditor` but is not used by the `richText` block.
