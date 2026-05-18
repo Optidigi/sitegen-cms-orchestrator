@@ -682,6 +682,49 @@ git add scripts/build-cms-css.mjs package.json
 git commit -m "feat: add scripts/build-cms-css.mjs for tenant CSS compilation"
 ```
 
+Create `scripts/docker-entrypoint.sh` (OBS-55 immediate workaround — copies `/app/dist/cms/*` into `/data/` on container start so siab-payload's canvas finds tenant-compiled CSS at the expected path):
+
+```sh
+#!/bin/sh
+# OBS-55 immediate workaround: sync /app/dist/cms/* into /data on container
+# start so siab-payload's canvas finds the tenant-compiled CSS. Requires
+# /data to be mounted :rw (compose example reflects this). When the proper
+# orchestrator-level docker cp deploy hook lands per OBS-55, this entrypoint
+# becomes inert and the compose mount can revert to :ro.
+set -e
+
+if [ -w /data ] && [ -d /app/dist/cms ]; then
+  cp -f /app/dist/cms/cms-editor.css /data/cms-editor.css 2>/dev/null || true
+  if [ -d /app/dist/cms/files ]; then
+    mkdir -p /data/files
+    cp -rf /app/dist/cms/files/. /data/files/ 2>/dev/null || true
+  fi
+  echo "[entrypoint] cms-editor.css + fonts synced to /data"
+else
+  echo "[entrypoint] /data not writable or no dist/cms — skipping CMS artifact sync"
+fi
+
+exec "$@"
+```
+
+Mark it executable:
+
+```bash
+chmod +x scripts/docker-entrypoint.sh
+```
+
+Verify:
+```bash
+test -x scripts/docker-entrypoint.sh && echo OK
+head -1 scripts/docker-entrypoint.sh | grep -q "^#!/bin/sh" && echo OK
+```
+
+Commit:
+```bash
+git add scripts/docker-entrypoint.sh
+git commit -m "feat: add scripts/docker-entrypoint.sh OBS-55 workaround"
+```
+
 ---
 
 ### Group 3 — Rewrite page routes to use CMS reader
