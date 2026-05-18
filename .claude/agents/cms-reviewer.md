@@ -154,6 +154,8 @@ If the original `nginx.conf` (now deleted, but reference the design spec or git 
   grep -q "headline: RtRoot" src/lib/types.ts && echo OK || echo BLOCKING
   grep -c "anchor?: string | null" src/lib/types.ts | awk '$1 >= 7 { print "OK" } $1 < 7 { print "BLOCKING: expected 7+ anchor declarations, got " $1 }'
   grep -q 'status: "draft" | "published"' src/lib/types.ts && echo OK || echo BLOCKING
+  grep -q "pills?: Array" src/lib/types.ts && echo OK || echo "BLOCKING: HeroBlock missing pills field"
+  grep -q "eyebrow?: RtRoot" src/lib/types.ts && echo OK || echo "BLOCKING: HeroBlock/CTABlock missing eyebrow: RtRoot field"
   ```
 - **`src/components/cms/Blocks.astro` dispatcher passes RtRoot directly + resolves media**:
   ```bash
@@ -161,6 +163,7 @@ If the original `nginx.conf` (now deleted, but reference the design spec or git 
   grep -q "imageUrl: resolve(block.image)\|imageUrl={resolveMedia" src/components/cms/Blocks.astro && echo OK || echo BLOCKING
   grep -q "avatarUrl: resolve(item.avatar)\|avatarUrl: resolveMedia" src/components/cms/Blocks.astro && echo OK || echo BLOCKING
   grep -q "anchor={block.anchor}\|anchor: block.anchor" src/components/cms/Blocks.astro && echo OK || echo BLOCKING
+  grep -q "pills={block.pills}\|pills: block.pills" src/components/cms/Blocks.astro && echo OK || echo "BLOCKING: Hero dispatch missing pills pass-through"
   ```
 - **`src/layouts/BaseLayout.astro` injects tenant-theme.css**:
   ```bash
