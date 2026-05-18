@@ -146,6 +146,42 @@ If the original `nginx.conf` (now deleted, but reference the design spec or git 
 - `CMD` runs `node ./dist/server/entry.mjs` (or whatever the configured entry is).
 - `ENV CMS_DATA_DIR=/data` set so the in-container default is correct.
 
+### Post-Phase-D contract (RtRoot + role tokens + canvas CSS sync)
+
+- **`src/lib/types.ts` declares RtRoot + post-Phase-D block shapes**:
+  ```bash
+  grep -q "export type RtRoot" src/lib/types.ts && echo OK || echo BLOCKING
+  grep -q "headline: RtRoot" src/lib/types.ts && echo OK || echo BLOCKING
+  grep -c "anchor?: string | null" src/lib/types.ts | awk '$1 >= 7 { print "OK" } $1 < 7 { print "BLOCKING: expected 7+ anchor declarations, got " $1 }'
+  grep -q 'status: "draft" | "published"' src/lib/types.ts && echo OK || echo BLOCKING
+  ```
+- **`src/components/cms/Blocks.astro` dispatcher passes RtRoot directly + resolves media**:
+  ```bash
+  grep -q "headline={block.headline}\|headline: block.headline" src/components/cms/Blocks.astro && echo OK || echo BLOCKING
+  grep -q "imageUrl: resolve(block.image)\|imageUrl={resolveMedia" src/components/cms/Blocks.astro && echo OK || echo BLOCKING
+  grep -q "avatarUrl: resolve(item.avatar)\|avatarUrl: resolveMedia" src/components/cms/Blocks.astro && echo OK || echo BLOCKING
+  grep -q "anchor={block.anchor}\|anchor: block.anchor" src/components/cms/Blocks.astro && echo OK || echo BLOCKING
+  ```
+- **`src/layouts/BaseLayout.astro` injects tenant-theme.css**:
+  ```bash
+  grep -q "tenant-theme.css" src/layouts/BaseLayout.astro && echo OK || echo BLOCKING
+  grep -q "data-tenant-theme" src/layouts/BaseLayout.astro && echo OK || echo BLOCKING
+  ```
+- **`scripts/build-cms-css.mjs` exists + invoked in package.json build**:
+  ```bash
+  test -f scripts/build-cms-css.mjs && echo OK || echo BLOCKING
+  grep -q "build-cms-css.mjs" package.json && echo OK || echo BLOCKING
+  ```
+- **`scripts/docker-entrypoint.sh` exists + wired in Dockerfile ENTRYPOINT**:
+  ```bash
+  test -x scripts/docker-entrypoint.sh && echo OK || echo BLOCKING
+  grep -q 'ENTRYPOINT.*docker-entrypoint.sh' Dockerfile && echo OK || echo BLOCKING
+  ```
+- **`docker-compose.cms.yml.example` mounts `/data:rw`** (per OBS-55 workaround):
+  ```bash
+  grep -q "/data:rw" docker-compose.cms.yml.example && echo OK || echo BLOCKING
+  ```
+
 ## Output format
 
 Return a markdown review:
