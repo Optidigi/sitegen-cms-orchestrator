@@ -919,6 +919,43 @@ grep -rIn "content/site" src/ && echo "FAIL: still importing content/site" || ec
 
 Expected: "OK: no content/site imports".
 
+After the SEO + JsonLd injections, add the tenant-theme.css read + injection at the END of `<head>` (so a tenant-theme rule overrides admin/template token defaults via CSS cascade):
+
+Read the current `src/layouts/BaseLayout.astro`. In the frontmatter (between `---` fences), add the imports + the async read:
+
+```astro
+import { promises as fs } from 'node:fs';
+import path from 'node:path';
+// ... existing imports preserved ...
+
+const _cmsDataDir = process.env.CMS_DATA_DIR;
+let tenantTheme = "";
+if (_cmsDataDir) {
+  try {
+    tenantTheme = await fs.readFile(path.resolve(_cmsDataDir, "tenant-theme.css"), "utf-8");
+  } catch (e: any) {
+    // ENOENT is the expected "tenant hasn't seeded their CSS yet" path — silent.
+    // Any other read error is unexpected — log so operators see "Payload wrote
+    // garbage" vs "no theme yet".
+    if (e?.code !== "ENOENT") console.error("[tenant-theme]", e);
+  }
+}
+```
+
+In the `<head>` block (AFTER existing Seo + JsonLd tags), add:
+
+```astro
+{tenantTheme && <style data-tenant-theme set:html={tenantTheme} />}
+```
+
+The `set:html` is operator-trusted content (the tenant compiled their own CSS via `scripts/build-cms-css.mjs` — see Group 2 above).
+
+Verify:
+```bash
+grep -q "tenant-theme.css" src/layouts/BaseLayout.astro && echo OK
+grep -q "data-tenant-theme" src/layouts/BaseLayout.astro && echo OK
+```
+
 Commit:
 ```bash
 git add src/layouts/ src/components/seo/
