@@ -143,13 +143,22 @@ For each markdown page:
      --arg tid "${TENANT_ID}" \
      --arg slug "${SLUG}" \
      --arg title "${TITLE}" \
-     --arg desc "${DESCRIPTION}" \
-     --argjson keywords "${KEYWORDS_JSON_ARRAY}" \
+     --arg seoTitle "${SEO_TITLE:-${TITLE}}" \
+     --arg desc "${DESCRIPTION:-}" \
      --arg ogImage "${OG_IMAGE:-}" \
-     --arg role "${ROLE}" \
-     --argjson order "${ORDER}" \
      --argjson blocks "${BLOCKS_JSON_ARRAY}" \
-     '{tenant:$tid, slug:$slug, title:$title, description:$desc, keywords:$keywords, ogImage:($ogImage|select(length>0)), role:$role, order:$order, blocks:$blocks}')
+     '{
+       tenant: $tid,
+       slug: $slug,
+       title: $title,
+       status: "published",
+       blocks: $blocks,
+       seo: (
+         {title: $seoTitle}
+         + (if $desc | length > 0 then {description: $desc} else {} end)
+         + (if $ogImage | length > 0 then {ogImage: $ogImage} else {} end)
+       )
+     }')
 
    curl -fsS -X POST "${PAYLOAD_API_URL}/api/pages" \
      -H "Authorization: users API-Key ${PAYLOAD_API_TOKEN}" \
@@ -159,7 +168,11 @@ For each markdown page:
 
    `<slug>` for `index.md` is `index`; for `about.md` is `about`; etc. (Filename without `.md`.)
 
-   Do NOT send `id` or `updatedAt` — both are server-assigned.
+   Notes on the shape:
+   - `description` + `ogImage` are nested under the `seo` group (per current `Pages.ts` schema). Top-level versions are silently dropped by Payload.
+   - `status: "published"` is set explicitly — without it, the schema's `defaultValue: "draft"` applies and the SSR site's projection won't include the page until an operator publishes manually in admin.
+   - `role`, `order`, and `keywords` from frontmatter are read (for static-site backwards-compat) but NOT sent — the current `Pages.ts` schema has none of these fields.
+   - Do NOT send `id` or `updatedAt` — both are server-assigned.
 
 After all pages, POST siteSettings with the same `jq -n` pattern. The orchestrator's input keys map onto the live `SiteSettings` schema as follows:
 
