@@ -102,73 +102,137 @@ git commit -m "chore: install @astrojs/node + @astrojs/preact and switch to SSR 
 Create `src/lib/types.ts`:
 
 ```ts
-// src/lib/types.ts — auto-scaffolded shape; mirrors siab-payload/src/blocks/*.ts.
+// src/lib/types.ts — auto-scaffolded shape; mirrors siab-payload/src/blocks/*.ts
+// (post-Phase-D + OBS-57) + siab-site-template/src/lib/types.ts (post-OBS-56).
 
-// Upload fields are projected to disk by Payload's `projectPageToDisk` hook
-// with depth>=1, so they arrive as full Media-like objects (not bare ids).
-// MediaRef accepts either shape so the renderer can degrade gracefully if
-// a tenant's data was projected without depth, but production sites should
-// always carry the populated object (with `.url`).
+// ---------------------------------------------------------------------------
+// Rich Text node types (mirrored from siab-payload/src/lib/richText/RtNode.ts)
+// ---------------------------------------------------------------------------
+export type RtMark = "bold" | "italic" | "underline" | "code" | "strikethrough"
+
+export interface RtText {
+  t: "text"
+  v: string
+  marks?: RtMark[]
+  style?: string
+  color?: string
+}
+
+export interface RtLink {
+  t: "link"
+  href: string
+  rel?: "external" | "internal"
+  children: RtInline[]
+}
+
+export interface RtLineBreak { t: "linebreak" }
+
+export type RtInline = RtText | RtLink | RtLineBreak
+
+export type RtAlign = "left" | "center" | "right" | "justify"
+
+export interface RtParagraph  { t: "paragraph"; align?: RtAlign; children: RtInline[] }
+export interface RtHeading    { t: "heading"; level: 2 | 3 | 4; align?: RtAlign; style?: string; children: RtInline[] }
+export interface RtList       { t: "list"; ordered: boolean; items: RtListItem[] }
+export interface RtListItem   { t: "listItem"; children: RtBlock[] }
+export interface RtBlockquote { t: "blockquote"; children: RtBlock[] }
+export interface RtDivider    { t: "divider" }
+
+export interface RtThemed {
+  t: "themed"
+  id: string
+  props: Record<string, unknown>
+  children?: RtBlock[]
+}
+
+export type RtBlock =
+  | RtParagraph
+  | RtHeading
+  | RtList
+  | RtBlockquote
+  | RtDivider
+  | RtThemed
+
+export interface RtBlockRoot  { t: "root"; variant: "block";  children: RtBlock[] }
+export interface RtInlineRoot { t: "root"; variant: "inline"; children: RtInline[] }
+export type RtRoot = RtBlockRoot | RtInlineRoot
+
+// ---------------------------------------------------------------------------
+// Media reference (resolved by Blocks.astro via mediaPath/resolveMedia helper)
+// ---------------------------------------------------------------------------
 export type MediaRef =
   | number
   | string
   | { id: number | string; url?: string | null; filename?: string | null; alt?: string | null }
   | null
 
+// ---------------------------------------------------------------------------
+// Block types — mirror siab-payload/src/blocks/*.ts schemas
+// ---------------------------------------------------------------------------
 export type HeroBlock = {
   blockType: "hero"
-  eyebrow?: string | null
-  headline: string
-  subheadline?: string | null
+  anchor?: string | null
+  eyebrow?: RtRoot | null
+  headline: RtRoot
+  subheadline?: RtRoot | null
+  pills?: Array<{ label: string; id?: string | null }>
   cta?: { label?: string | null; href?: string | null } | null
-  image?: MediaRef  // populated Media object (preferred) or bare id; resolved by Blocks.astro
+  image?: MediaRef
+  imageAlt?: string | null
 }
 
 export type FeatureListBlock = {
   blockType: "featureList"
-  title?: string | null
-  intro?: string | null
+  anchor?: string | null
+  title?: RtRoot | null
+  intro?: RtRoot | null
   features: Array<{
-    title: string
-    description?: string | null
-    icon?: string | null  // lucide-react icon name
+    title: RtRoot
+    description?: RtRoot | null
+    icon?: string | null
   }>
 }
 
 export type TestimonialsBlock = {
   blockType: "testimonials"
+  anchor?: string | null
   title?: string | null
   items: Array<{
     quote: string
     author: string
     role?: string | null
-    avatar?: MediaRef  // populated Media object (preferred) or bare id
+    avatar?: MediaRef
   }>
 }
 
 export type FAQBlock = {
   blockType: "faq"
-  title?: string | null
-  items: Array<{ question: string; answer: string }>
+  anchor?: string | null
+  title?: RtRoot | null
+  items: Array<{ question: RtRoot; answer: RtRoot }>
 }
 
 export type CTABlock = {
   blockType: "cta"
-  headline: string
-  description?: string | null
-  primary?: { label?: string | null; href?: string | null } | null
+  anchor?: string | null
+  eyebrow?: RtRoot | null
+  headline: RtRoot
+  description?: RtRoot | null
+  primary: { label: string; href: string }
   secondary?: { label?: string | null; href?: string | null } | null
 }
 
 export type RichTextBlock = {
   blockType: "richText"
-  body: string
+  anchor?: string | null
+  body: RtRoot
 }
 
 export type ContactSectionBlock = {
   blockType: "contactSection"
-  title?: string | null
-  description?: string | null
+  anchor?: string | null
+  title?: RtRoot | null
+  description?: RtRoot | null
   formName: string
   fields: Array<{
     name: string
@@ -187,55 +251,59 @@ export type Block =
   | RichTextBlock
   | ContactSectionBlock
 
+// ---------------------------------------------------------------------------
+// Page + SiteSettings types
+// ---------------------------------------------------------------------------
 export type Page = {
-  id: string;
-  slug: string;
-  title: string;
-  description: string;
-  keywords: string[];
-  ogImage?: string;
-  role: 'home' | 'about' | 'services' | 'contact' | 'page';
-  order: number;
-  blocks: Block[];
-  updatedAt: string;
-};
+  id: string
+  slug: string
+  title: string
+  status: "draft" | "published"
+  blocks: Block[]
+  seo?: {
+    title?: string | null
+    description?: string | null
+    ogImage?: MediaRef | string | null
+  }
+  updatedAt: string
+}
 
 export type NAP = {
-  legalName: string;
-  displayName: string;
-  street: string;
-  postalCode: string;
-  city: string;
-  country: string;
-  phone: string;
-  email: string;
-};
+  legalName: string
+  displayName: string
+  street: string
+  postalCode: string
+  city: string
+  country: string
+  phone: string
+  email: string
+}
 
 export type OpeningHours = {
-  dayOfWeek: 'Mo' | 'Tu' | 'We' | 'Th' | 'Fr' | 'Sa' | 'Su';
-  opens: string;
-  closes: string;
-};
+  dayOfWeek: 'Mo' | 'Tu' | 'We' | 'Th' | 'Fr' | 'Sa' | 'Su'
+  opens: string
+  closes: string
+}
 
 export type SiteSettings = {
-  brand: string;
-  language: string;
-  primaryDomain: string;
-  aliases: string[];
-  description: string;
-  nap?: NAP;
-  hours?: OpeningHours[];
-  serviceArea?: string[];
+  brand: string
+  language: string
+  primaryDomain: string
+  aliases: string[]
+  description?: string
+  nap?: NAP
+  hours?: OpeningHours[]
+  serviceArea?: string[]
   socials: {
-    facebook?: string;
-    instagram?: string;
-    linkedin?: string;
-    youtube?: string;
-    x?: string;
-  };
-  nav: { label: string; href: string }[];
-  updatedAt: string;
-};
+    facebook?: string
+    instagram?: string
+    linkedin?: string
+    youtube?: string
+    x?: string
+  }
+  nav: { label: string; href: string }[]
+  updatedAt: string
+}
 ```
 
 Create `src/lib/cms.ts`:
@@ -428,12 +496,14 @@ const resolve =
   list.map((block) => {
     if (block.blockType === "hero") {
       const props = {
+        anchor: block.anchor,
         eyebrow: block.eyebrow,
         headline: block.headline,
         subheadline: block.subheadline,
+        pills: block.pills,
         cta: block.cta,
         imageUrl: resolve(block.image),
-        imageAlt: null,
+        imageAlt: block.imageAlt,
       }
       return (
         <BlockErrorBoundary blockType="hero" client:load={hydrate}>
@@ -445,6 +515,7 @@ const resolve =
       return (
         <BlockErrorBoundary blockType="featureList" client:load={hydrate}>
           <FeatureList
+            anchor={block.anchor}
             title={block.title}
             intro={block.intro}
             features={block.features}
@@ -462,14 +533,24 @@ const resolve =
       }))
       return (
         <BlockErrorBoundary blockType="testimonials" client:load={hydrate}>
-          <Testimonials title={block.title} items={items} client:load={hydrate} />
+          <Testimonials
+            anchor={block.anchor}
+            title={block.title}
+            items={items}
+            client:load={hydrate}
+          />
         </BlockErrorBoundary>
       )
     }
     if (block.blockType === "faq") {
       return (
         <BlockErrorBoundary blockType="faq" client:load={hydrate}>
-          <FAQ title={block.title} items={block.items} client:load={hydrate} />
+          <FAQ
+            anchor={block.anchor}
+            title={block.title}
+            items={block.items}
+            client:load={hydrate}
+          />
         </BlockErrorBoundary>
       )
     }
@@ -477,6 +558,8 @@ const resolve =
       return (
         <BlockErrorBoundary blockType="cta" client:load={hydrate}>
           <CTA
+            anchor={block.anchor}
+            eyebrow={block.eyebrow}
             headline={block.headline}
             description={block.description}
             primary={block.primary}
@@ -489,7 +572,11 @@ const resolve =
     if (block.blockType === "richText") {
       return (
         <BlockErrorBoundary blockType="richText" client:load={hydrate}>
-          <RichText body={block.body} client:load={hydrate} />
+          <RichText
+            anchor={block.anchor}
+            body={block.body}
+            client:load={hydrate}
+          />
         </BlockErrorBoundary>
       )
     }
@@ -497,6 +584,7 @@ const resolve =
       return (
         <BlockErrorBoundary blockType="contactSection" client:load={hydrate}>
           <ContactSection
+            anchor={block.anchor}
             title={block.title}
             description={block.description}
             formName={block.formName}
@@ -524,6 +612,117 @@ Commit:
 ```bash
 git add src/lib/ src/middleware.ts src/pages/healthz.ts src/pages/media/ src/components/cms/
 git commit -m "feat: add cms reader, types, middleware, healthz, media route, blocks renderer"
+```
+
+Create `scripts/build-cms-css.mjs` (Node helper that compiles tenant theme CSS at build time, producing `dist/cms/cms-editor.css` for siab-payload's canvas to consume via `loadTenantCss.ts`):
+
+```js
+#!/usr/bin/env node
+// Compile the site's global.css + rich-text.css through Tailwind v4 standalone
+// to produce dist/cms/cms-editor.css (consumed by siab-payload's canvas via
+// loadTenantCss.ts). Also copies @fontsource woff2 files to dist/cms/files/.
+// Runs after `astro build`.
+
+import { execSync } from "node:child_process"
+import { readdirSync, mkdirSync, copyFileSync, existsSync } from "node:fs"
+import { resolve } from "node:path"
+
+const ROOT = process.cwd()
+const OUT_DIR = resolve(ROOT, "dist/cms")
+const OUT_CSS = resolve(OUT_DIR, "cms-editor.css")
+const OUT_FILES = resolve(OUT_DIR, "files")
+
+mkdirSync(OUT_DIR, { recursive: true })
+
+// Compile Tailwind from global.css (which imports rich-text.css). Uses the
+// site's tailwindcss dep — same version Astro's vite plugin uses for the
+// main build.
+execSync(`npx --yes tailwindcss -i src/styles/global.css -o ${OUT_CSS}`, {
+  stdio: "inherit",
+  cwd: ROOT,
+})
+
+// Copy @fontsource-variable woff2 files (if any installed) to dist/cms/files/
+const fontsRoot = resolve(ROOT, "node_modules/@fontsource-variable")
+if (existsSync(fontsRoot)) {
+  mkdirSync(OUT_FILES, { recursive: true })
+  for (const family of readdirSync(fontsRoot)) {
+    const filesDir = resolve(fontsRoot, family, "files")
+    if (!existsSync(filesDir)) continue
+    for (const file of readdirSync(filesDir)) {
+      if (!file.endsWith(".woff2")) continue
+      copyFileSync(resolve(filesDir, file), resolve(OUT_FILES, file))
+    }
+  }
+}
+
+console.log(`[build-cms-css] wrote ${OUT_CSS} and ${OUT_FILES}/*.woff2`)
+```
+
+Update `package.json` to chain this after `astro build`:
+
+```bash
+node -e '
+const pkg = require("./package.json")
+pkg.scripts ||= {}
+pkg.scripts.build = "astro build && node scripts/build-cms-css.mjs"
+require("fs").writeFileSync("./package.json", JSON.stringify(pkg, null, 2) + "\n")
+'
+```
+
+Verify:
+```bash
+test -f scripts/build-cms-css.mjs && echo OK
+grep -q "build-cms-css.mjs" package.json && echo OK
+```
+
+Commit:
+```bash
+git add scripts/build-cms-css.mjs package.json
+git commit -m "feat: add scripts/build-cms-css.mjs for tenant CSS compilation"
+```
+
+Create `scripts/docker-entrypoint.sh` (OBS-55 immediate workaround — copies `/app/dist/cms/*` into `/data/` on container start so siab-payload's canvas finds tenant-compiled CSS at the expected path):
+
+```sh
+#!/bin/sh
+# OBS-55 immediate workaround: sync /app/dist/cms/* into /data on container
+# start so siab-payload's canvas finds the tenant-compiled CSS. Requires
+# /data to be mounted :rw (compose example reflects this). When the proper
+# orchestrator-level docker cp deploy hook lands per OBS-55, this entrypoint
+# becomes inert and the compose mount can revert to :ro.
+set -e
+
+if [ -w /data ] && [ -d /app/dist/cms ]; then
+  cp -f /app/dist/cms/cms-editor.css /data/cms-editor.css 2>/dev/null || true
+  if [ -d /app/dist/cms/files ]; then
+    mkdir -p /data/files
+    cp -rf /app/dist/cms/files/. /data/files/ 2>/dev/null || true
+  fi
+  echo "[entrypoint] cms-editor.css + fonts synced to /data"
+else
+  echo "[entrypoint] /data not writable or no dist/cms — skipping CMS artifact sync"
+fi
+
+exec "$@"
+```
+
+Mark it executable:
+
+```bash
+chmod +x scripts/docker-entrypoint.sh
+```
+
+Verify:
+```bash
+test -x scripts/docker-entrypoint.sh && echo OK
+head -1 scripts/docker-entrypoint.sh | grep -q "^#!/bin/sh" && echo OK
+```
+
+Commit:
+```bash
+git add scripts/docker-entrypoint.sh
+git commit -m "feat: add scripts/docker-entrypoint.sh OBS-55 workaround"
 ```
 
 ---
@@ -720,6 +919,43 @@ grep -rIn "content/site" src/ && echo "FAIL: still importing content/site" || ec
 
 Expected: "OK: no content/site imports".
 
+After the SEO + JsonLd injections, add the tenant-theme.css read + injection at the END of `<head>` (so a tenant-theme rule overrides admin/template token defaults via CSS cascade):
+
+Read the current `src/layouts/BaseLayout.astro`. In the frontmatter (between `---` fences), add the imports + the async read:
+
+```astro
+import { promises as fs } from 'node:fs';
+import path from 'node:path';
+// ... existing imports preserved ...
+
+const _cmsDataDir = process.env.CMS_DATA_DIR;
+let tenantTheme = "";
+if (_cmsDataDir) {
+  try {
+    tenantTheme = await fs.readFile(path.resolve(_cmsDataDir, "tenant-theme.css"), "utf-8");
+  } catch (e: any) {
+    // ENOENT is the expected "tenant hasn't seeded their CSS yet" path — silent.
+    // Any other read error is unexpected — log so operators see "Payload wrote
+    // garbage" vs "no theme yet".
+    if (e?.code !== "ENOENT") console.error("[tenant-theme]", e);
+  }
+}
+```
+
+In the `<head>` block (AFTER existing Seo + JsonLd tags), add:
+
+```astro
+{tenantTheme && <style data-tenant-theme set:html={tenantTheme} />}
+```
+
+The `set:html` is operator-trusted content (the tenant compiled their own CSS via `scripts/build-cms-css.mjs` — see Group 2 above).
+
+Verify:
+```bash
+grep -q "tenant-theme.css" src/layouts/BaseLayout.astro && echo OK
+grep -q "data-tenant-theme" src/layouts/BaseLayout.astro && echo OK
+```
+
 Commit:
 ```bash
 git add src/layouts/ src/components/seo/
@@ -759,10 +995,16 @@ COPY --from=build /app/package.json /app/pnpm-lock.yaml ./
 RUN corepack enable && pnpm install --prod --frozen-lockfile
 COPY --from=build /app/dist ./dist
 
+# OBS-55 entrypoint workaround — copy dist/cms/* into /data on start.
+# Becomes inert when proper orchestrator deploy hook lands per OBS-55.
+COPY scripts/docker-entrypoint.sh /usr/local/bin/docker-entrypoint.sh
+RUN chmod +x /usr/local/bin/docker-entrypoint.sh
+
 EXPOSE 4321
 
 HEALTHCHECK --interval=30s --timeout=3s CMD wget -qO- http://127.0.0.1:4321/healthz >/dev/null || exit 1
 
+ENTRYPOINT ["/usr/local/bin/docker-entrypoint.sh"]
 CMD ["node", "./dist/server/entry.mjs"]
 ```
 
@@ -806,7 +1048,7 @@ services:
     ports:
       - "4321:4321"
     volumes:
-      - <vps-data-path>:/data:ro
+      - <vps-data-path>:/data:rw   # OBS-55 workaround: was :ro; entrypoint needs write. Revert to :ro when proper orchestrator-level docker cp deploy hook lands per OBS-55.
     environment:
       CMS_DATA_DIR: /data
       SITE_URL: https://<primaryDomain>
@@ -839,7 +1081,7 @@ This site reads editorial content from a per-tenant Payload CMS data directory m
 
 **Required volume:**
 
-- Mount the per-tenant data dir at `/data:ro`. See `docker-compose.cms.yml.example`.
+- Mount the per-tenant data dir at `/data:rw` (OBS-55 workaround — see `docker-compose.cms.yml.example`). Reverts to `:ro` when the proper orchestrator-level deploy hook lands.
 
 **Editor:**
 
