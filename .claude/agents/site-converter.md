@@ -614,6 +614,74 @@ git add src/lib/ src/middleware.ts src/pages/healthz.ts src/pages/media/ src/com
 git commit -m "feat: add cms reader, types, middleware, healthz, media route, blocks renderer"
 ```
 
+Create `scripts/build-cms-css.mjs` (Node helper that compiles tenant theme CSS at build time, producing `dist/cms/cms-editor.css` for siab-payload's canvas to consume via `loadTenantCss.ts`):
+
+```js
+#!/usr/bin/env node
+// Compile the site's global.css + rich-text.css through Tailwind v4 standalone
+// to produce dist/cms/cms-editor.css (consumed by siab-payload's canvas via
+// loadTenantCss.ts). Also copies @fontsource woff2 files to dist/cms/files/.
+// Runs after `astro build`.
+
+import { execSync } from "node:child_process"
+import { readdirSync, mkdirSync, copyFileSync, existsSync } from "node:fs"
+import { resolve } from "node:path"
+
+const ROOT = process.cwd()
+const OUT_DIR = resolve(ROOT, "dist/cms")
+const OUT_CSS = resolve(OUT_DIR, "cms-editor.css")
+const OUT_FILES = resolve(OUT_DIR, "files")
+
+mkdirSync(OUT_DIR, { recursive: true })
+
+// Compile Tailwind from global.css (which imports rich-text.css). Uses the
+// site's tailwindcss dep — same version Astro's vite plugin uses for the
+// main build.
+execSync(`npx --yes tailwindcss -i src/styles/global.css -o ${OUT_CSS}`, {
+  stdio: "inherit",
+  cwd: ROOT,
+})
+
+// Copy @fontsource-variable woff2 files (if any installed) to dist/cms/files/
+const fontsRoot = resolve(ROOT, "node_modules/@fontsource-variable")
+if (existsSync(fontsRoot)) {
+  mkdirSync(OUT_FILES, { recursive: true })
+  for (const family of readdirSync(fontsRoot)) {
+    const filesDir = resolve(fontsRoot, family, "files")
+    if (!existsSync(filesDir)) continue
+    for (const file of readdirSync(filesDir)) {
+      if (!file.endsWith(".woff2")) continue
+      copyFileSync(resolve(filesDir, file), resolve(OUT_FILES, file))
+    }
+  }
+}
+
+console.log(`[build-cms-css] wrote ${OUT_CSS} and ${OUT_FILES}/*.woff2`)
+```
+
+Update `package.json` to chain this after `astro build`:
+
+```bash
+node -e '
+const pkg = require("./package.json")
+pkg.scripts ||= {}
+pkg.scripts.build = "astro build && node scripts/build-cms-css.mjs"
+require("fs").writeFileSync("./package.json", JSON.stringify(pkg, null, 2) + "\n")
+'
+```
+
+Verify:
+```bash
+test -f scripts/build-cms-css.mjs && echo OK
+grep -q "build-cms-css.mjs" package.json && echo OK
+```
+
+Commit:
+```bash
+git add scripts/build-cms-css.mjs package.json
+git commit -m "feat: add scripts/build-cms-css.mjs for tenant CSS compilation"
+```
+
 ---
 
 ### Group 3 — Rewrite page routes to use CMS reader
