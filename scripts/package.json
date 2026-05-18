@@ -1,0 +1,12 @@
+{
+  "name": "siab-payload-orchestrator-scripts",
+  "private": true,
+  "type": "module",
+  "description": "Helper scripts used by payload-orchestrator subagents (notably payload-seeder).",
+  "dependencies": {
+    "marked": "^14.0.0"
+  },
+  "scripts": {
+    "test": "node --test"
+  }
+}
